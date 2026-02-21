@@ -1,0 +1,135 @@
+import LoadOut from '../models/transaction/LoadOut.js';
+import LoadIn from '../models/transaction/loadIn.js';
+import Rates from '../models/rates.js';
+import { Item } from '../models/SKU.js';
+
+export const ItemWiseSummary = async (req, res) => {
+    const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
+
+    try {
+        const { startDate, endDate } = req.body;
+
+        if (!startDate || !endDate) return res.status(400).json({ success: false, message: "Dates required" });
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        if (start > end) return res.status(400).json({ success: false, message: "Invalid date range" });
+
+        const [loadouts, loadins, rates, items] = await Promise.all([
+            LoadOut.find({ depo: req.user?.depo, date: { $gte: start, $lte: end } }),
+            LoadIn.find({ depo: req.user?.depo, date: { $gte: start, $lte: end } }),
+            Rates.find({ depo: req.user?.depo, date: { $lte: end } }).sort({ date: 1 }),
+            Item.find({ depo: req.user?.depo })
+        ]);
+
+        const itemMap = new Map();
+        for (const i of items) {
+            const code = normalize(i.code);
+            if (normalize(i.container) === normalize("emt")) continue;
+            else {
+                itemMap.set(code, {
+                    itemCode: code,
+                    name: i.name,
+                    qty: 0,
+                    amount: 0
+                });
+            }
+        }
+
+        const rateMap = new Map();
+        for (const r of rates) {
+            const code = normalize(r.itemCode);
+            if (!rateMap.has(code)) {
+                rateMap.set(code, [])
+            }
+            rateMap.get(code).push(r);
+        };
+
+        const getRateforDate = (itemCode, saleDate) => {
+            const list = rateMap.get(normalize(itemCode));
+            if (!list) return null;
+
+            let choosen = null;
+            for (const r of list) {
+                if (r.date <= saleDate) choosen = r;
+                else break;
+            }
+            return choosen;
+        };
+
+        for (const loadout of loadouts) {
+            for (const item of loadout.items) {
+                const rate = getRateforDate(item.itemCode, loadout.date);
+                if (!rate) continue;
+
+                const baseAmount = rate.basePrice * item.qty;
+                const taxableAmount = baseAmount - (baseAmount * ((rate.perDisc || 0) / 100));
+                const taxAmount = taxableAmount * ((rate.perTax || 0) / 100);
+
+                const finalAmount = taxableAmount + taxAmount;
+
+                const agg = itemMap.get(normalize(item.itemCode));
+                if (!agg) continue;
+                agg.qty += item.qty;
+                agg.amount += finalAmount;
+            }
+        }
+
+        for (const loadin of loadins) {
+            for (const item of loadin.items) {
+                const rate = getRateforDate(item.itemCode, loadin.date);
+                if (!rate) continue;
+
+                const baseAmount = rate.basePrice * ((item.Filled || 0) + (item.Burst || 0));
+                const taxableAmount = baseAmount - (baseAmount * ((rate.perDisc || 0) / 100));
+                const taxAmount = taxableAmount * ((rate.perTax || 0) / 100);
+
+                const finalAmount = taxableAmount + taxAmount;
+
+                const agg = itemMap.get(normalize(item.itemCode));
+                if (!agg) continue;
+                agg.qty -= ((item.Filled || 0) + (item.Burst || 0));
+                agg.amount -= finalAmount;
+            }
+        }
+
+        const summary = [];
+        let grandTotalQty = 0;
+        let grandTotalAmount = 0;
+
+        for (const [itemCode, data] of itemMap) {
+            summary.push({
+                itemCode,
+                name: data.name,
+                qty: data.qty,
+                amount: parseFloat(data.amount.toFixed(2))
+            });
+
+            grandTotalQty += data.qty;
+            grandTotalAmount += data.amount;
+        }
+
+        summary.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
+
+        res.status(200).json({
+            success: true,
+            data: summary,
+            grandTotal: {
+                qty: grandTotalQty,
+                amount: parseFloat(grandTotalAmount.toFixed(2))
+            }
+        });
+
+    }
+    catch (err) {
+        console.error('Error in itemwise summary:', err);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: err.message
+        });
+    }
+}

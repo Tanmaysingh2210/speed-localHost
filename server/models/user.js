@@ -1,0 +1,19 @@
+import mongoose from 'mongoose';
+
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    depo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'depo-master',
+        required: true
+    },
+    otp: { type: String },
+    otpExpire: { type: Date },
+    isVerified: { type: Boolean, default: false },
+    resetPasswordOtp: { type: String },
+    resetPasswordOtpExpire: { type: Date },
+})
+
+export default mongoose.model('user', userSchema);

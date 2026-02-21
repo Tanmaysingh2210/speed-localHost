@@ -1,0 +1,75 @@
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+import User from '../../models/user.js';
+import bcrypt from 'bcrypt';
+import Depo from "../../models/depoModal.js";
+import mongoose from 'mongoose';
+
+export const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'kisansathiservice@gmail.com',
+        pass: 'zufwxczkbrmmxcpi'
+    }
+});
+
+
+const generateOtp = () => crypto.randomInt(100000, 999999).toString();
+
+
+export const register = async (req, res) => {
+    try {
+        const { name, email, password, depo } = req.body;
+        if (!name || !email || !password || !depo) return res.status(400).json({ message: "All fields are required!" });
+
+        if (!mongoose.Types.ObjectId.isValid(depo)) {
+            return res.status(400).json({ message: "Invalid depo ID" });
+        }
+
+        const depoExists = await Depo.findById(depo);
+        if (!depoExists) {
+            return res.status(400).json({ message: "Depo not found" });
+        }
+
+        let user = await User.findOne({ email });
+        if (user) return res.status(400).json({ message: "user already exists" });
+
+        const otp = generateOtp();
+        const otpExpire = new Date(Date.now() + 5 * 60 * 1000);
+
+        const hashedPass = await bcrypt.hash(password, 10);
+
+        await User.create({
+            name,
+            email,
+            password: hashedPass,
+            depo,
+            otp,
+            otpExpire
+        })
+        // bcrypt.genSalt(10, (err, salt) => {
+        //     bcrypt.hash(password, salt, async (err, hash) => {
+        //         await User.create({
+        //             name,
+        //             email,
+        //             password: hash,
+        //             depo,
+        //             otp,
+        //             otpExpire
+        //         })
+        //     })
+        // });
+
+        await transporter.sendMail({
+            from: 'kisansathiservice@gmail.com',
+            to: email,
+            subject: 'otp verification',
+            text: `Your otp is: ${otp} to register on Speed website`
+        })
+
+        res.status(201).json({ message: "User registered. otp sent to email Please verify!" })
+
+    } catch (err) {
+        res.status(500).json({ message: "Error registering user", error: err.message });
+    }
+}
