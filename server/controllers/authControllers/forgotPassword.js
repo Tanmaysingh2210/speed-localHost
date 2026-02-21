@@ -23,7 +23,7 @@ export const forgotPassword = async (req, res) => {
         await user.save();
 
         await transporter.sendMail({
-            from: 'kisansathiservice@gmail.com',
+            from: 'sanbeverageservice@gmail.com',
             to: email,
             subject: 'otp verification',
             text: `Your reset password otp is: ${resetOtp} . verify to change password.`

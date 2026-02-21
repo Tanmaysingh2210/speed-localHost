@@ -8,8 +8,8 @@ import mongoose from 'mongoose';
 export const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'kisansathiservice@gmail.com',
-        pass: 'zufwxczkbrmmxcpi'
+        user: 'sanbeverageservice@gmail.com',
+        pass: 'azyxsnwlytcgdjsq'
     }
 });
 
@@ -47,21 +47,10 @@ export const register = async (req, res) => {
             otp,
             otpExpire
         })
-        // bcrypt.genSalt(10, (err, salt) => {
-        //     bcrypt.hash(password, salt, async (err, hash) => {
-        //         await User.create({
-        //             name,
-        //             email,
-        //             password: hash,
-        //             depo,
-        //             otp,
-        //             otpExpire
-        //         })
-        //     })
-        // });
+
 
         await transporter.sendMail({
-            from: 'kisansathiservice@gmail.com',
+            from: 'sanbeverageservice@gmail.com',
             to: email,
             subject: 'otp verification',
             text: `Your otp is: ${otp} to register on Speed website`

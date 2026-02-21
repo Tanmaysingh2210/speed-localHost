@@ -159,6 +159,7 @@ export default function SignInPage() {
                                     <button type="submit" disabled={submitting} className="submit">{submitting ? "Signing In..." : "Sign In"} </button>
                                     <a className='link' onClick={() => setStep("email")}>Forgot Password?</a>
                                 </form>
+                                <p>Not a user? <Link to={`/register`}>Register</Link> </p>
                             </div>
                         </>
                     )}
@@ -209,7 +210,7 @@ export default function SignInPage() {
                         <>
                             <div className="heading">Reset Password</div>
 
-                            <form className="form" style={{width: "45%"}} onSubmit={handleResetPassword}>
+                            <form className="form" style={{ width: "45%" }} onSubmit={handleResetPassword}>
                                 <div className="input-group">
                                     <input
                                         type="password"

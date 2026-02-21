@@ -123,7 +123,7 @@ const LoadOut = () => {
             setNewLoadOut({
                 salesmanCode: "",
                 date: "",
-                trip: "",
+                trip: 1,
                 items: []
             });
 

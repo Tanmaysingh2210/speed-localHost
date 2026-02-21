@@ -40,7 +40,6 @@ const Burger = ({ onMenuToggle }) => {
         return matchDepo?.depoName ?? "";
     }
 
-
     return (
         <>
             <button

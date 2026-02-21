@@ -81,6 +81,7 @@ export default function RegisterPage() {
             }
             const msg = await verifyOtp({ email, otp: code });
             showToast(msg || 'OTP verified successfully!', 'success');
+            navigate("/signin");
         } catch (err) {
             console.log(err);
             const backendMessage = err.message || 'Invalid OTP';
@@ -169,6 +170,7 @@ export default function RegisterPage() {
                                     </div>
 
                                 </form>
+                                <p>Already user? <Link to={`/signin`}>Login</Link></p>
                             </div>
                         </>
                     ) : (

@@ -12,7 +12,6 @@ import Purchase from './purchase/PurchaseRoutes';
 import Depo from './Depo';
 import StockDashboard from './stock/Stock';
 import SummaryRoutes from './Summary/SummaryRoutes';
-import RegisterPage from './RegisterPage';
 
 
 const Dashboard = () => {
@@ -27,7 +26,6 @@ const Dashboard = () => {
         <Routes>
           <Route index element={<Navigate to="stock" replace />} />
 
-          <Route path="/register" element={<RegisterPage />} />
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/summary/*" element={<SummaryRoutes />} />
           <Route path="/sku/*" element={<Sku />} />
