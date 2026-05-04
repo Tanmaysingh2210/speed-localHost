@@ -433,7 +433,6 @@ const Item = () => {
     saveAs(new Blob([buffer]), "item-master.xlsx");
   };
 
-
   return (
     <div className="table-container">
       <div className="header-row">
@@ -548,8 +547,8 @@ const Item = () => {
                     <option disabled>Loading...</option>
                   ) : (
                     containers.map((c) => (
-                      <option key={c._id || c} value={c.name || c}>
-                        {c.name.toUpperCase() || c.toUpperCase()}
+                      <option key={c._id || c} value={(c.name || c).trim().toUpperCase()}>
+                        {(c.name || c).trim().toUpperCase()}
                       </option>
                     ))
                   )}
@@ -569,8 +568,8 @@ const Item = () => {
                     <option disabled>Loading...</option>
                   ) : (
                     packages.map((c) => (
-                      <option key={c._id || c} value={c.name || c}>
-                        {c.name.toUpperCase() || c.toUpperCase()}
+                      <option key={c._id || c} value={(c.name || c).trim().toUpperCase()}>
+                        {(c.name || c).trim().toUpperCase()}
                       </option>
                     ))
                   )}
@@ -590,8 +589,8 @@ const Item = () => {
                     <option disabled>Loading...</option>
                   ) : (
                     flavours.map((c) => (
-                      <option key={c._id || c} value={c.name || c}>
-                        {c.name.toUpperCase() || c.toUpperCase()}
+                      <option key={c._id || c} value={(c.name || c).trim().toUpperCase()}>
+                        {(c.name || c).trim().toUpperCase()}
                       </option>
                     ))
                   )}
