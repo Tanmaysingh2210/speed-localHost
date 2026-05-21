@@ -1,4 +1,6 @@
 import LoadIn from '../../models/transaction/loadIn.js';
+import { Item } from '../../models/SKU.js';
+import { normalizeQty } from '../../utils/normalizeQty.js';
 
 export const addLoadIn = async (req, res) => {
     try {
@@ -12,11 +14,25 @@ export const addLoadIn = async (req, res) => {
 
         if (existing) return res.status(400).json({ message: `Loadin record of ${salesmanCode} at ${date} exists for ${trip}` });
 
+        const normalizedItems = await Promise.all(items.map(async (it) => {
+            const sku = await Item.findOne({ code: it.itemCode.toUpperCase(), depo });
+            if (!sku) throw new Error(`Item ${it.itemCode} not found`);
+            if (sku.container.toLowerCase() == "emt") {
+                return { ...it, Emt: normalizeQty(it.Emt, sku.packOf) }
+            }
+            else {
+                return {
+                    ...it, Filled: normalizeQty(it.Filled, sku.packOf),
+                    Burst: normalizeQty(it.Burst, sku.packOf),
+                };
+            }
+        }));
+
         await LoadIn.create({
             salesmanCode: salesmanCode,
             date,
             trip,
-            items,
+            items: normalizedItems,
             depo
         });
 

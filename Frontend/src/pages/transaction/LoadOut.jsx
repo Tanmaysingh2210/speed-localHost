@@ -1,3 +1,526 @@
+// import React, { useState, useEffect, useRef } from 'react';
+// import { useToast } from '../../context/ToastContext';
+// import { useNavigate, useLocation } from 'react-router-dom';
+// import { useTransaction } from '../../context/TransactionContext';
+// import { useSKU } from '../../context/SKUContext';
+// import { useSalesman } from '../../context/SalesmanContext';
+// import "./transaction.css";
+// import { useSalesmanModal } from '../../context/SalesmanModalContext';
+// import {normalizeQty} from '../../utils/quantity';
+
+
+// const LoadOut = () => {
+//     const navigate = useNavigate();
+//     const location = useLocation();
+//     const { showToast } = useToast();
+
+//     const [modalQtyMap, setModalQtyMap] = useState({});
+
+
+//     const [itemShow, setItemShow] = useState(false);
+//     const [search, setSearch] = useState("");
+//     const { loading, addLoadout, updateLoadout } = useTransaction();
+//     const { items } = useSKU();
+//     const { salesmans } = useSalesman();
+
+//     const { openSalesmanModal } = useSalesmanModal();
+
+//     const editMode = location.state?.editMode || false;
+//     const editData = location.state?.editData || null;
+
+//     const modalCodeRef = useRef(null);
+//     const modalDateRef = useRef(null);
+//     const modalTripRef = useRef(null);
+//     const modalItemRef = useRef(null);
+//     const modalQtyRef = useRef(null);
+
+//     const saveRef = useRef(null);
+//     const addRef = useRef(null);
+
+//     const [newLoadItem, setNewLoadItem] = useState({
+//         itemCode: "",
+//         qty: "",
+//     });
+
+//     const [newLoadOut, setNewLoadOut] = useState({
+//         salesmanCode: editData?.salesmanCode.trim().toUpperCase() || "",
+//         date: editData?.date ? editData.date.split('T')[0] : "",
+//         trip: editData?.trip || 1,
+//         items: editData?.items || []
+//     });
+
+//     const matchedSalesman = Array.isArray(salesmans)
+//         ? salesmans.find((sm) => String(sm.codeNo || sm.code || '').toUpperCase() === String(newLoadOut.salesmanCode || '').toUpperCase())
+//         : null;
+
+//     const handleAddItem = () => {
+//         const qtyNum = Number(newLoadItem.qty);
+
+//         if (!newLoadItem.itemCode || !newLoadItem.qty || qtyNum <= 0) {
+//             showToast("Enter valid item code and quantity", "error");
+//             return;
+//         }
+
+//         const exists = newLoadOut.items.find(
+//             (it) => it.itemCode.toUpperCase() === newLoadItem.itemCode.toUpperCase()
+//         );
+
+//         const matchedSKU = items.find(
+//             sku => sku.code.toUpperCase() === newLoadItem.itemCode.toUpperCase()
+//         );
+
+//         if (!matchedSKU) {
+//             showToast("Invalid item code", "error");
+//             return;
+//         }
+
+//         if (exists) {
+//             showToast("Item already exist", "error");
+//             return;
+//         }
+
+//         const normalizedQty = normalizeQty(qtyNum, matchedSKU.packOf);
+
+//         setNewLoadOut((prev) => ({
+//             ...prev,
+//             items: [...prev.items, { ...newLoadItem, qty: normalizedQty }]
+//         }));
+
+//         setNewLoadItem({ itemCode: "", qty: "" });
+//         modalItemRef.current?.focus();
+//     };
+
+//     const handleDelete = (code) => {
+//         setNewLoadOut((prev) => ({
+//             ...prev,
+//             items: prev.items.filter((it) => it.itemCode !== code)
+//         }));
+
+//         showToast("Item removed", "success");
+//     };
+
+//     const handleSubmit = async (e) => {
+//         e.preventDefault();
+
+//         if (!newLoadOut.salesmanCode || !newLoadOut.date || newLoadOut.trip <= 0 || newLoadOut.items.length == 0) {
+//             showToast("Fill all fields properly", "error");
+//             return;
+//         }
+//         const paylaod = {
+//             salesmanCode: newLoadOut.salesmanCode.trim().toUpperCase(),
+//             date: newLoadOut.date,
+//             trip: newLoadOut.trip,
+//             items: newLoadOut.items,
+//         };
+
+//         try {
+//             if (editMode && editData) {
+//                 await updateLoadout(editData._id, paylaod);
+//                 setTimeout(() => {
+//                     navigate('/transaction/all-transaction');
+//                 }, 100);
+//             } else {
+//                 await addLoadout(paylaod);
+//             }
+
+//             setNewLoadOut({
+//                 salesmanCode: "",
+//                 date: "",
+//                 trip: 1,
+//                 items: []
+//             });
+
+//         } catch (err) {
+//             console.log(err);
+//             console.error(err.response?.data?.message || "Error adding loadout");
+//         }
+//     };
+
+//     const handleCancel = () => {
+//         if (window.confirm('Are you sure you want to cancel? changes will be lost.')) {
+//             navigate('/transaction/all-transaction');
+//         }
+//     };
+
+
+//     const handleKeyNav = (e, currentField) => {
+//         if (["ArrowRight", "ArrowDown", "Enter"].includes(e.key)) {
+//             e.preventDefault();
+
+//             if (e.key === "Enter" && currentField === "save") {
+//                 saveRef.current?.click();
+//                 return;
+//             }
+
+//             switch (currentField) {
+//                 case "code":
+//                     modalDateRef.current?.focus();
+//                     break;
+//                 case "date":
+//                     modalTripRef.current?.focus();
+//                     break;
+//                 case "trip":
+//                     modalItemRef.current?.focus();
+//                     break;
+//                 case "item":
+//                     modalQtyRef.current?.focus();
+//                     break;
+//                 case "qty":
+//                     if (e.key === "Enter") addRef.current?.click();
+//                     else addRef.current?.focus();
+//                     break;
+//                 case "add":
+//                     if (e.key === "Enter") addRef.current?.click();
+//                     else saveRef.current?.focus();
+//                     break;
+//                 default:
+//                     break;
+//             }
+//         } else if (["ArrowUp", "ArrowLeft"].includes(e.key)) {
+//             e.preventDefault();
+//             switch (currentField) {
+//                 case "date":
+//                     modalCodeRef.current?.focus();
+//                     break;
+//                 case "trip":
+//                     modalDateRef.current?.focus();
+//                     break;
+//                 case "item":
+//                     modalTripRef.current?.focus();
+//                     break;
+//                 case "qty":
+//                     modalItemRef.current?.focus();
+//                     break;
+//                 case "add":
+//                     modalQtyRef.current?.focus();
+//                     break;
+//                 case "save":
+//                     addRef.current?.focus();
+//                     break;
+//                 default:
+//                     break;
+//             }
+//         }
+//     };
+
+//     return (
+//         <div className="trans">
+//             <div className='trans-container'>
+//                 <div className="trans-left">
+//                     <form className='trans-form' >
+//                         <div className="salesman-detail">
+//                             <div className="form-group">
+//                                 <label>Salesman Code</label>
+
+//                                 <div className="input-with-btn">
+//                                     <input
+//                                         type="text"
+//                                         placeholder="Enter Salesman code"
+//                                         value={newLoadOut.salesmanCode}
+//                                         onChange={(e) =>
+//                                             setNewLoadOut({ ...newLoadOut, salesmanCode: e.target.value.trim().toUpperCase() })
+//                                         }
+//                                         ref={modalCodeRef}
+//                                         onKeyDown={(e) => handleKeyNav(e, "code")}
+//                                     />
+
+//                                     <button
+//                                         type="button"
+//                                         className="dropdown-btn"
+//                                         onClick={() =>
+//                                             openSalesmanModal((code) =>
+//                                                 setNewLoadOut(prev => ({ ...prev, salesmanCode: code.trim().toUpperCase() }))
+//                                             )
+//                                         }
+//                                     >
+//                                         ⌄
+//                                     </button>
+//                                 </div>
+//                             </div>
+
+//                             <div className="form-group">
+//                                 <label>Salesman Name</label>
+//                                 <input
+//                                     readOnly
+//                                     type="text"
+//                                     value={matchedSalesman ? matchedSalesman.name : ""}
+//                                     style={{ backgroundColor: "#f5f5f5" }}
+//                                 />
+//                             </div>
+//                             <div className="form-group">
+//                                 <label>Route No.</label>
+//                                 <input
+//                                     readOnly
+//                                     type="number"
+//                                     value={matchedSalesman ? matchedSalesman.routeNo : ""}
+//                                     style={{ backgroundColor: "#f5f5f5" }}
+//                                 />
+//                             </div>
+//                             <div className="form-group">
+//                                 <label>Date</label>
+//                                 <input
+//                                     type="date"
+//                                     value={newLoadOut.date}
+//                                     onChange={(e) => setNewLoadOut({ ...newLoadOut, date: e.target.value })}
+//                                     ref={modalDateRef}
+//                                     onKeyDown={(e) => handleKeyNav(e, "date")}
+//                                 />
+//                             </div>
+//                             <div className="form-group">
+//                                 <label>Trip No.</label>
+//                                 <input
+//                                     type="number"
+//                                     placeholder='Enter trip no.'
+//                                     value={newLoadOut.trip}
+//                                     ref={modalTripRef}
+//                                     onChange={(e) => setNewLoadOut({ ...newLoadOut, trip: e.target.value })}
+//                                     onKeyDown={(e) => handleKeyNav(e, "trip")}
+//                                 />
+//                             </div>
+//                         </div>
+//                     </form>
+
+//                     <div className="item-inputs">
+//                         <div className="flex">
+//                             <div className="form-group">
+//                                 <label>Item Code</label>
+//                                 <div className="input-with-btn">
+//                                     <input
+//                                         type="text"
+//                                         placeholder='Enter Item code'
+//                                         value={newLoadItem.itemCode}
+//                                         ref={modalItemRef}
+//                                         onChange={(e) => setNewLoadItem({ ...newLoadItem, itemCode: e.target.value.trim().toUpperCase() })}
+//                                         onKeyDown={(e) => handleKeyNav(e, "item")}
+//                                     />
+//                                     <button
+//                                         type="button"
+//                                         className="dropdown-btn"
+//                                         onClick={() =>
+//                                             setItemShow(true)
+//                                         }
+//                                     >
+//                                         ⌄
+//                                     </button>
+//                                 </div>
+//                             </div>
+//                             <div className="form-group">
+//                                 <label>Qty</label>
+//                                 <input
+//                                     type="number"
+//                                     step="0.01"
+//                                     min="0"
+//                                     value={newLoadItem.qty}
+//                                     placeholder='Enter qty'
+//                                     ref={modalQtyRef}
+//                                     onChange={(e) => setNewLoadItem({ ...newLoadItem, qty: e.target.value })}
+//                                     onKeyDown={(e) => handleKeyNav(e, "qty")}
+//                                 />
+//                             </div>
+//                             <button type="button" className="add-btn" onKeyDown={(e) => handleKeyNav(e, "add")} onClick={handleAddItem} ref={addRef} >
+//                                 ➕ Add Item
+//                             </button>
+//                         </div>
+//                         <div className="table">
+//                             <div className="trans-table-grid trans-table-header">
+//                                 <div>CODE</div>
+//                                 <div>NAME</div>
+//                                 <div>Qty</div>
+//                                 <div>ACTION</div>
+//                             </div>
+//                             {loading && <div>Loading...</div>}
+
+//                             {newLoadOut.items.length > 0 ? (
+//                                 newLoadOut.items.map((it, index) => {
+//                                     const matchedItem = items.find(
+//                                         (sku) => sku.code.toUpperCase() === it.itemCode.toUpperCase()
+//                                     );
+//                                     return (
+//                                         <div key={index} className="trans-table-grid trans-table-row">
+//                                             <div>{it.itemCode.trim().toUpperCase()}</div>
+//                                             <div>{matchedItem ? matchedItem.name.trim().toUpperCase() : "-"}</div>
+//                                             <div>{it.qty}</div>
+//                                             <div className="actions">
+//                                                 <span
+//                                                     className="delete"
+//                                                     onClick={() => handleDelete(it.itemCode)}
+//                                                 >
+//                                                     Delete
+//                                                 </span>
+//                                             </div>
+//                                         </div>
+//                                     );
+//                                 })
+//                             ) : (
+//                                 <div className="no-items">No Items added yet!</div>
+//                             )}
+//                         </div>
+//                     </div>
+//                 </div>
+//             </div>
+//             <div className="flex hidden">
+//                 <button
+//                     onClick={handleSubmit}
+//                     ref={saveRef}
+//                     onKeyDown={(e) => handleKeyNav(e, "save")}
+//                     disabled={loading}
+//                     className='trans-submit-btn'
+//                 >
+//                     {loading ? "Saving..." : editMode ? 'Update' : 'Submit'}
+//                 </button>
+//                 <button
+//                     className="trans-cancel-btn"
+//                     onClick={handleCancel}
+//                     disabled={loading}
+//                     style={editMode ? { display: "block" } : { display: "none" }}
+//                 >
+//                     Cancel
+//                 </button>
+//             </div>
+
+//             {itemShow && (
+//                 <div className="modal-overlay">
+//                     <div className="modal-box">
+//                         <div className="modal-header">
+//                             <h3>Select Items</h3>
+//                             <button
+//                                 className="modal-close-btn"
+//                                 onClick={() => setItemShow(false)}
+//                             >
+//                                 ✕
+//                             </button>
+//                         </div>
+
+//                         <input
+//                             className="modal-search"
+//                             placeholder="Search by code or name"
+//                             value={search}
+//                             onChange={(e) => setSearch(e.target.value)}
+//                         />
+
+//                         <div className="modal-table">
+//                             <div className="modal-row4 modal-head">
+//                                 <div>Code</div>
+//                                 <div>Name</div>
+//                                 <div>Status</div>
+//                                 <div>Qty</div>
+//                             </div>
+
+//                             {items
+//                                 .filter(itm => itm.container.toUpperCase() !== "EMT")
+//                                 .filter(itm =>
+//                                     itm.code.toLowerCase().includes(search.toLowerCase()) ||
+//                                     itm.name.toLowerCase().includes(search.toLowerCase())
+//                                 )
+//                                 .map(itm => (
+//                                     <div key={itm._id} className="modal-row4">
+//                                         <div>{itm.code}</div>
+//                                         <div>{itm.name}</div>
+
+//                                         <div
+//                                             className={`status-badge ${itm.status === "Inactive" ? "inactive" : "active"
+//                                                 }`}
+//                                         >
+//                                             {itm.status}
+//                                         </div>
+
+//                                         <input
+//                                             type="number"
+//                                             min="0"
+//                                             step="0.01"
+//                                             placeholder="Qty"
+//                                             value={modalQtyMap[itm.code.trim().toUpperCase()] || ""}
+//                                             onChange={(e) =>
+//                                                 setModalQtyMap(prev => ({
+//                                                     ...prev,
+//                                                     [itm.code]: e.target.value.trim().toUpperCase()
+//                                                 }))
+//                                             }
+//                                             style={{
+//                                                 width: "70px",
+//                                                 padding: "6px 8px",
+//                                                 backgroundColor: "#fff",
+//                                                 border: "1px solid #d1d5db",
+//                                                 borderRadius: "6px",
+//                                                 color: "#111",
+//                                                 fontSize: "14px"
+//                                             }}
+//                                         />
+//                                     </div>
+//                                 ))}
+
+//                             <button
+//                                 className="add-btn"
+//                                 onClick={() => {
+//                                     const itemsToAdd = Object.entries(modalQtyMap)
+//                                         .filter(([_, qty]) => Number(qty) > 0)
+//                                         .map(([code, qty]) => {
+
+//                                             return {
+//                                                 itemCode: code.trim().toUpperCase(),
+//                                                 qty: Number(qty),
+
+//                                             };
+//                                         });
+
+
+//                                     if (itemsToAdd.length === 0) {
+//                                         showToast("Enter qty for at least one item", "error");
+//                                         return;
+//                                     }
+
+//                                     // setNewLoadOut(prev => ({
+//                                     //     ...prev,
+//                                     //     items: [...prev.items, ...itemsToAdd]
+//                                     // }));
+
+//                                     setNewLoadOut(prev => {
+//                                         const updatedItems = [...prev.items];
+
+//                                         itemsToAdd.forEach(newItem => {
+//                                             const index = updatedItems.findIndex(
+//                                                 it =>
+//                                                     it.itemCode.trim().toUpperCase() ===
+//                                                     newItem.itemCode.trim().toUpperCase()
+//                                             );
+
+//                                             if (index !== -1) {
+//                                                 updatedItems[index].qty = Number(newItem.qty);
+//                                             } else {
+//                                                 updatedItems.push({
+//                                                     itemCode: newItem.itemCode.trim().toUpperCase(),
+//                                                     qty: Number(newItem.qty)
+//                                                 });
+//                                             }
+//                                         });
+
+//                                         return {
+//                                             ...prev,
+//                                             items: updatedItems
+//                                         };
+//                                     });
+
+//                                     setModalQtyMap({});
+//                                     setItemShow(false);
+//                                 }}
+//                             >
+//                                 Add Items
+//                             </button>
+
+
+//                         </div>
+//                     </div>
+//                 </div>
+//             )}
+
+//         </div>
+
+//     )
+// }
+
+// export default LoadOut
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -6,6 +529,7 @@ import { useSKU } from '../../context/SKUContext';
 import { useSalesman } from '../../context/SalesmanContext';
 import "./transaction.css";
 import { useSalesmanModal } from '../../context/SalesmanModalContext';
+import { normalizeQty } from '../../utils/quantity';
 
 
 const LoadOut = () => {
@@ -14,14 +538,11 @@ const LoadOut = () => {
     const { showToast } = useToast();
 
     const [modalQtyMap, setModalQtyMap] = useState({});
-
-
     const [itemShow, setItemShow] = useState(false);
     const [search, setSearch] = useState("");
     const { loading, addLoadout, updateLoadout } = useTransaction();
     const { items } = useSKU();
     const { salesmans } = useSalesman();
-
     const { openSalesmanModal } = useSalesmanModal();
 
     const editMode = location.state?.editMode || false;
@@ -32,7 +553,6 @@ const LoadOut = () => {
     const modalTripRef = useRef(null);
     const modalItemRef = useRef(null);
     const modalQtyRef = useRef(null);
-
     const saveRef = useRef(null);
     const addRef = useRef(null);
 
@@ -74,13 +594,15 @@ const LoadOut = () => {
         }
 
         if (exists) {
-            showToast("Item already exist", "error");
+            showToast("Item already exists", "error");
             return;
         }
 
+        const normalizedQty = normalizeQty(qtyNum, matchedSKU.packOf);
+
         setNewLoadOut((prev) => ({
             ...prev,
-            items: [...prev.items, { ...newLoadItem, qty: qtyNum }]
+            items: [...prev.items, { ...newLoadItem, qty: normalizedQty }]
         }));
 
         setNewLoadItem({ itemCode: "", qty: "" });
@@ -92,18 +614,18 @@ const LoadOut = () => {
             ...prev,
             items: prev.items.filter((it) => it.itemCode !== code)
         }));
-
         showToast("Item removed", "success");
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!newLoadOut.salesmanCode || !newLoadOut.date || newLoadOut.trip <= 0 || newLoadOut.items.length == 0) {
+        if (!newLoadOut.salesmanCode || !newLoadOut.date || newLoadOut.trip <= 0 || newLoadOut.items.length === 0) {
             showToast("Fill all fields properly", "error");
             return;
         }
-        const paylaod = {
+
+        const payload = {
             salesmanCode: newLoadOut.salesmanCode.trim().toUpperCase(),
             date: newLoadOut.date,
             trip: newLoadOut.trip,
@@ -112,12 +634,12 @@ const LoadOut = () => {
 
         try {
             if (editMode && editData) {
-                await updateLoadout(editData._id, paylaod);
+                await updateLoadout(editData._id, payload);
                 setTimeout(() => {
                     navigate('/transaction/all-transaction');
                 }, 100);
             } else {
-                await addLoadout(paylaod);
+                await addLoadout(payload);
             }
 
             setNewLoadOut({
@@ -139,7 +661,6 @@ const LoadOut = () => {
         }
     };
 
-
     const handleKeyNav = (e, currentField) => {
         if (["ArrowRight", "ArrowDown", "Enter"].includes(e.key)) {
             e.preventDefault();
@@ -150,18 +671,10 @@ const LoadOut = () => {
             }
 
             switch (currentField) {
-                case "code":
-                    modalDateRef.current?.focus();
-                    break;
-                case "date":
-                    modalTripRef.current?.focus();
-                    break;
-                case "trip":
-                    modalItemRef.current?.focus();
-                    break;
-                case "item":
-                    modalQtyRef.current?.focus();
-                    break;
+                case "code": modalDateRef.current?.focus(); break;
+                case "date": modalTripRef.current?.focus(); break;
+                case "trip": modalItemRef.current?.focus(); break;
+                case "item": modalQtyRef.current?.focus(); break;
                 case "qty":
                     if (e.key === "Enter") addRef.current?.click();
                     else addRef.current?.focus();
@@ -170,32 +683,18 @@ const LoadOut = () => {
                     if (e.key === "Enter") addRef.current?.click();
                     else saveRef.current?.focus();
                     break;
-                default:
-                    break;
+                default: break;
             }
         } else if (["ArrowUp", "ArrowLeft"].includes(e.key)) {
             e.preventDefault();
             switch (currentField) {
-                case "date":
-                    modalCodeRef.current?.focus();
-                    break;
-                case "trip":
-                    modalDateRef.current?.focus();
-                    break;
-                case "item":
-                    modalTripRef.current?.focus();
-                    break;
-                case "qty":
-                    modalItemRef.current?.focus();
-                    break;
-                case "add":
-                    modalQtyRef.current?.focus();
-                    break;
-                case "save":
-                    addRef.current?.focus();
-                    break;
-                default:
-                    break;
+                case "date": modalCodeRef.current?.focus(); break;
+                case "trip": modalDateRef.current?.focus(); break;
+                case "item": modalTripRef.current?.focus(); break;
+                case "qty": modalItemRef.current?.focus(); break;
+                case "add": modalQtyRef.current?.focus(); break;
+                case "save": addRef.current?.focus(); break;
+                default: break;
             }
         }
     };
@@ -204,11 +703,10 @@ const LoadOut = () => {
         <div className="trans">
             <div className='trans-container'>
                 <div className="trans-left">
-                    <form className='trans-form' >
+                    <form className='trans-form'>
                         <div className="salesman-detail">
                             <div className="form-group">
                                 <label>Salesman Code</label>
-
                                 <div className="input-with-btn">
                                     <input
                                         type="text"
@@ -220,7 +718,6 @@ const LoadOut = () => {
                                         ref={modalCodeRef}
                                         onKeyDown={(e) => handleKeyNav(e, "code")}
                                     />
-
                                     <button
                                         type="button"
                                         className="dropdown-btn"
@@ -293,9 +790,7 @@ const LoadOut = () => {
                                     <button
                                         type="button"
                                         className="dropdown-btn"
-                                        onClick={() =>
-                                            setItemShow(true)
-                                        }
+                                        onClick={() => setItemShow(true)}
                                     >
                                         ⌄
                                     </button>
@@ -305,22 +800,31 @@ const LoadOut = () => {
                                 <label>Qty</label>
                                 <input
                                     type="number"
+                                    step="0.01"
+                                    min="0"
                                     value={newLoadItem.qty}
-                                    placeholder='Enter qty'
+                                    placeholder='0.00'
                                     ref={modalQtyRef}
                                     onChange={(e) => setNewLoadItem({ ...newLoadItem, qty: e.target.value })}
                                     onKeyDown={(e) => handleKeyNav(e, "qty")}
                                 />
                             </div>
-                            <button type="button" className="add-btn" onKeyDown={(e) => handleKeyNav(e, "add")} onClick={handleAddItem} ref={addRef} >
+                            <button
+                                type="button"
+                                className="add-btn"
+                                onKeyDown={(e) => handleKeyNav(e, "add")}
+                                onClick={handleAddItem}
+                                ref={addRef}
+                            >
                                 ➕ Add Item
                             </button>
                         </div>
+
                         <div className="table">
                             <div className="trans-table-grid trans-table-header">
                                 <div>CODE</div>
                                 <div>NAME</div>
-                                <div>Qty</div>
+                                <div>QTY</div>
                                 <div>ACTION</div>
                             </div>
                             {loading && <div>Loading...</div>}
@@ -334,7 +838,7 @@ const LoadOut = () => {
                                         <div key={index} className="trans-table-grid trans-table-row">
                                             <div>{it.itemCode.trim().toUpperCase()}</div>
                                             <div>{matchedItem ? matchedItem.name.trim().toUpperCase() : "-"}</div>
-                                            <div>{it.qty}</div>
+                                            <div>{Number(it.qty).toFixed(2)}</div>
                                             <div className="actions">
                                                 <span
                                                     className="delete"
@@ -353,6 +857,7 @@ const LoadOut = () => {
                     </div>
                 </div>
             </div>
+
             <div className="flex hidden">
                 <button
                     onClick={handleSubmit}
@@ -411,23 +916,19 @@ const LoadOut = () => {
                                     <div key={itm._id} className="modal-row4">
                                         <div>{itm.code}</div>
                                         <div>{itm.name}</div>
-
-                                        <div
-                                            className={`status-badge ${itm.status === "Inactive" ? "inactive" : "active"
-                                                }`}
-                                        >
+                                        <div className={`status-badge ${itm.status === "Inactive" ? "inactive" : "active"}`}>
                                             {itm.status}
                                         </div>
-
                                         <input
                                             type="number"
                                             min="0"
-                                            placeholder="Qty"
+                                            step="0.01"
+                                            placeholder="0.00"
                                             value={modalQtyMap[itm.code.trim().toUpperCase()] || ""}
                                             onChange={(e) =>
                                                 setModalQtyMap(prev => ({
                                                     ...prev,
-                                                    [itm.code]: e.target.value.trim().toUpperCase()
+                                                    [itm.code.trim().toUpperCase()]: e.target.value
                                                 }))
                                             }
                                             style={{
@@ -449,49 +950,41 @@ const LoadOut = () => {
                                     const itemsToAdd = Object.entries(modalQtyMap)
                                         .filter(([_, qty]) => Number(qty) > 0)
                                         .map(([code, qty]) => {
-
+                                            // Find SKU to get packOf for normalization
+                                            const matchedSKU = items.find(
+                                                sku => sku.code.trim().toUpperCase() === code.trim().toUpperCase()
+                                            );
+                                            const normalizedQty = matchedSKU
+                                                ? normalizeQty(Number(qty), matchedSKU.packOf)
+                                                : Number(qty); // fallback: no normalization if SKU not found
                                             return {
                                                 itemCode: code.trim().toUpperCase(),
-                                                qty: Number(qty),
-
+                                                qty: normalizedQty,
                                             };
                                         });
-
 
                                     if (itemsToAdd.length === 0) {
                                         showToast("Enter qty for at least one item", "error");
                                         return;
                                     }
 
-                                    // setNewLoadOut(prev => ({
-                                    //     ...prev,
-                                    //     items: [...prev.items, ...itemsToAdd]
-                                    // }));
-
                                     setNewLoadOut(prev => {
                                         const updatedItems = [...prev.items];
 
                                         itemsToAdd.forEach(newItem => {
                                             const index = updatedItems.findIndex(
-                                                it =>
-                                                    it.itemCode.trim().toUpperCase() ===
-                                                    newItem.itemCode.trim().toUpperCase()
+                                                it => it.itemCode.trim().toUpperCase() === newItem.itemCode.trim().toUpperCase()
                                             );
 
                                             if (index !== -1) {
-                                                updatedItems[index].qty = Number(newItem.qty);
+                                                // update qty with normalization already applied
+                                                updatedItems[index].qty = newItem.qty;
                                             } else {
-                                                updatedItems.push({
-                                                    itemCode: newItem.itemCode.trim().toUpperCase(),
-                                                    qty: Number(newItem.qty)
-                                                });
+                                                updatedItems.push(newItem);
                                             }
                                         });
 
-                                        return {
-                                            ...prev,
-                                            items: updatedItems
-                                        };
+                                        return { ...prev, items: updatedItems };
                                     });
 
                                     setModalQtyMap({});
@@ -500,16 +993,12 @@ const LoadOut = () => {
                             >
                                 Add Items
                             </button>
-
-
                         </div>
                     </div>
                 </div>
             )}
-
         </div>
+    );
+};
 
-    )
-}
-
-export default LoadOut
+export default LoadOut;

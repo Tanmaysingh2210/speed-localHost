@@ -11,6 +11,10 @@ export const ItemModalProvider = ({ children }) => {
   const [search, setSearch] = useState("");
   const [onSelectCallback, setOnSelectCallback] = useState(null);
 
+  // utils/quantity.js
+
+
+
   const openItemModal = (callback) => {
     setOnSelectCallback(() => callback);
     setShow(true);
@@ -34,7 +38,7 @@ export const ItemModalProvider = ({ children }) => {
       {/* 🔽 GLOBAL SALESMAN MODAL */}
       {show && (
         <div className="modal-overlay"
-        onMouseDown={(e) => e.stopPropagation()}>
+          onMouseDown={(e) => e.stopPropagation()}>
           <div className="modal-box">
             <div className="modal-header">
               <h3>Select Items</h3>
@@ -71,15 +75,14 @@ export const ItemModalProvider = ({ children }) => {
                     className="modal-row"
                     onClick={() => {
                       onSelectCallback?.(it.code);
-                     closeItemModal();
+                      closeItemModal();
                     }}
                   >
                     <div>{it.code}</div>
                     <div>{it.name}</div>
                     <div
-                      className={`status-badge ${
-                        it.status === "Inactive" ? "inactive" : "active"
-                      }`}
+                      className={`status-badge ${it.status === "Inactive" ? "inactive" : "active"
+                        }`}
                     >
                       {it.status}
                     </div>

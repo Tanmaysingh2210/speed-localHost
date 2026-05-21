@@ -14,16 +14,16 @@ const LoadInSchema = new mongoose.Schema({
     default: 1
   },
   depo: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'depo-master',
-        required: true
-    },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'depo-master',
+    required: true
+  },
   items: [
     {
       itemCode: { type: String, required: true },
-      Filled: { type: Number, default: 0 },
-      Burst: { type: Number, default: 0 },
-      Emt:{type:Number, default:0 }
+      Filled: { type: String, default: 0 },
+      Burst: { type: String, default: 0 },
+      Emt: { type: String, default: 0 }
     }
   ],
 },

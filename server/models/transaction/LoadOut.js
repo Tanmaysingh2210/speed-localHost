@@ -12,7 +12,7 @@ const loadOutSchema = new mongoose.Schema({
     items: [
         {
             itemCode: { type: String, required: true },
-            qty: { type: Number, required: true },
+            qty: { type: String, required: true },
         },
     ],
 }, { timestamps: false });

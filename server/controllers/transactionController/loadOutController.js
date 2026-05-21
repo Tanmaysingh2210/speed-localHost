@@ -1,27 +1,31 @@
 import LoadOut from "../../models/transaction/LoadOut.js";
 import StockService from '../../services/StockCalculator.js';
-
+import { Item } from '../../models/SKU.js';
+import { normalizeQty } from "../../utils/normalizeQty.js";
 
 export const addLoadout = async (req, res) => {
     try {
         const { salesmanCode, date, trip, items } = req.body;
 
-        if (!salesmanCode || !date || !Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "All fields are required" });
+        if (!salesmanCode || !date || !Array.isArray(items) || items.length === 0)
+            return res.status(400).json({ message: "All fields are required" });
 
         const depo = req.user?.depo;
 
-        const existing = await LoadOut.findOne({ salesmanCode: salesmanCode, date: date, trip, depo });
-
+        const existing = await LoadOut.findOne({ salesmanCode, date, trip, depo });
         if (existing) return res.status(400).json({ message: `Loadout record exists` });
 
-
-        // Clean up expired items first
         await StockService.cleanupExpiredItems(depo);
-        // Process loadout with FIFO logic
-        const allocations = await StockService.processLoadout(items, depo);
-        // Check for shortfalls
-        const hasShortfall = allocations.some(a => a.shortfall > 0);
 
+        const normalizedItems = await Promise.all(items.map(async (it) => {
+            const sku = await Item.findOne({ code: it.itemCode.toUpperCase(), depo });
+            if (!sku) throw new Error(`Item ${it.itemCode} not found`);
+            return { ...it, qty: normalizeQty(it.qty, sku.packOf) };
+        }));
+
+        const allocations = await StockService.processLoadout(normalizedItems, depo);
+
+        const hasShortfall = allocations.some(a => a.shortfall > 0);
         if (hasShortfall) {
             return res.status(400).json({
                 success: false,
@@ -30,16 +34,15 @@ export const addLoadout = async (req, res) => {
             });
         }
 
-        // Create loadout record
         await LoadOut.create({
-            salesmanCode: salesmanCode,
-            date: date,
+            salesmanCode,
+            date,
             trip,
-            items,
+            items: normalizedItems,
             depo
         });
-        
-        res.status(200).json({ message: "loadout added sucessfully", success: true, allocations });
+
+        res.status(200).json({ message: "Loadout added successfully", success: true, allocations });
 
     } catch (err) {
         res.status(500).json({ message: "Error adding loadOut", error: err.message, success: false });
@@ -49,7 +52,8 @@ export const addLoadout = async (req, res) => {
 export const getLoadOut = async (req, res) => {
     try {
         const { salesmanCode, date, trip } = req.body;
-        if (!salesmanCode || !date || !trip) return res.status(400).json({ message: "All fields are required" });
+        if (!salesmanCode || !date || !trip)
+            return res.status(400).json({ message: "All fields are required" });
 
         const data = await LoadOut.findOne({ salesmanCode, date, trip, depo: req.user?.depo });
         if (!data) return res.status(404).json({ message: "Loadout record not found" });
@@ -65,28 +69,39 @@ export const getAllLoadOuts = async (req, res) => {
         if (!data) return res.status(404).json({ message: "Record not found" });
         res.status(200).json(data);
     } catch (err) {
-        res.status(500).json({ message: "Error fetching reccord", error: err.message });
+        res.status(500).json({ message: "Error fetching record", error: err.message });
     }
 };
 
 export const updateLoadOut = async (req, res) => {
     try {
+        const { items } = req.body;
+        const depo = req.user?.depo;
+
+        let updatePayload = { ...req.body };
+
+        if (Array.isArray(items) && items.length > 0) {
+            const normalizedItems = await Promise.all(items.map(async (it) => {
+                const sku = await Item.findOne({ code: it.itemCode.toUpperCase(), depo });
+                if (!sku) return it; // fallback: keep as-is if SKU not found
+                return { ...it, qty: normalizeQty(it.qty, sku.packOf) };
+            }));
+            updatePayload = { ...updatePayload, items: normalizedItems };
+        }
+
         const updated = await LoadOut.findOneAndUpdate(
-            { _id: req.params.id, depo: req.user?.depo },
-            req.body,
+            { _id: req.params.id, depo },
+            updatePayload,
             { new: true, runValidators: true }
         );
 
-        if (!updated) {
-            return res.status(404).json({ message: "Loadout not found" });
-        }
+        if (!updated) return res.status(404).json({ message: "Loadout not found" });
 
         res.status(200).json(updated);
     } catch (err) {
         res.status(500).json({ message: "Error updating loadout", error: err.message });
     }
 };
-
 
 export const deleteLoadOut = async (req, res) => {
     try {
@@ -97,7 +112,3 @@ export const deleteLoadOut = async (req, res) => {
         res.status(500).json({ message: "Error deleting loadout", error: err.message });
     }
 };
-
-
-
-
