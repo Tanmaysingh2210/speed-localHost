@@ -6,11 +6,11 @@ const itemSchema = new mongoose.Schema({
     required: true
   },
   qty: {
-    type: Number,
+    type: String,
     required: true
   },
   remainingQty: {
-    type: Number,
+    type: String,
     required: true,
     default: function () { return this.qty; }
   },

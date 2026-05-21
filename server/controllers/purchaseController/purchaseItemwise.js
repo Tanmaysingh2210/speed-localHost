@@ -1,18 +1,19 @@
 import PurchaseItemwise from '../../models/purchase/PurchaseItemwise.js';
+import { Item } from '../../models/SKU.js';
+import { normalizeQty } from '../../utils/normalizeQty.js';
 
-// CREATE - New Purchase Itemwise Entry
 export const createPurchaseItemwise = async (req, res) => {
     try {
         const { date, items } = req.body;
 
-        // Validation
+
         if (!date || !items || items.length === 0) {
             return res.status(400).json({
                 message: 'Please provide date and items'
             });
         }
         const depo = req.user?.depo;
-        // Validate each item
+
         for (let item of items) {
             if (!item.itemCode || !item.qty || !item.expiryDate) {
                 return res.status(400).json({
@@ -21,14 +22,26 @@ export const createPurchaseItemwise = async (req, res) => {
             }
         }
 
-        // Create new purchase itemwise
+        const normalizedItems = await Promise.all(items.map(async (item) => {
+            const sku = await Item.findOne({ code: item.itemCode.toUpperCase(), depo });
+            if (!sku) throw new Error(`Item ${item.itemCode} not found in SKU`);
+
+            const normalizedQty = normalizeQty(Number(item.qty), sku.packOf);
+
+            return {
+                itemCode: item.itemCode.toUpperCase(),
+                qty: normalizedQty,
+                remainingQty: normalizedQty,
+                expiryDate: item.expiryDate
+            };
+        }));
+
         const newPurchase = new PurchaseItemwise({
             date,
             depo,
-            items
+            items: normalizedItems
         });
 
-        // Save to database
         const savedPurchase = await newPurchase.save();
 
         res.status(201).json({
@@ -45,7 +58,6 @@ export const createPurchaseItemwise = async (req, res) => {
     }
 };
 
-// READ - Get All Purchase Itemwise
 export const getAllPurchaseItemwise = async (req, res) => {
     try {
         const purchases = await PurchaseItemwise.find({ depo: req.user?.depo }).sort({ date: -1 });
@@ -65,7 +77,6 @@ export const getAllPurchaseItemwise = async (req, res) => {
     }
 };
 
-// READ - Get Single Purchase Itemwise by ID
 export const getPurchaseItemwiseById = async (req, res) => {
     try {
         const purchase = await PurchaseItemwise.findOne({ _id: req.params.id, depo: req.user?.depo });
@@ -90,22 +101,35 @@ export const getPurchaseItemwiseById = async (req, res) => {
     }
 };
 
-// UPDATE - Update Purchase Itemwise
 export const updatePurchaseItemwise = async (req, res) => {
     try {
-        const updateData = req.body;
+        const { items, ...rest } = req.body;
+        let updatePayload = { ...rest };
+        const depo = req.user?.depo;
+
+        if (Array.isArray(items) && items.length > 0) {
+            const normalizedItems = await Promise.all(items.map(async (item) => {
+                const sku = await Item.findOne({ code: item.itemCode.toUpperCase(), depo });
+                if (!sku) return item; // fallback
+                const normalizedQty = normalizeQty(Number(item.qty), sku.packOf);
+                return {
+                    ...item,
+                    itemCode: item.itemCode.toUpperCase(),
+                    qty: normalizedQty,
+                    remainingQty: item.remainingQty ?? normalizedQty // preserve remainingQty if already set
+                };
+            }));
+            updatePayload = { ...updatePayload, items: normalizedItems };
+        }
+
 
         const updatedPurchase = await PurchaseItemwise.findOneAndUpdate(
-            { _id: req.params.id, depo: req.user?.depo },
-            updateData,
+            { _id: req.params.id, depo },
+            updatePayload,
             { new: true, runValidators: true }
         );
 
-        if (!updatedPurchase) {
-            return res.status(404).json({
-                message: 'Purchase itemwise not found'
-            });
-        }
+        if (!updatedPurchase) return res.status(404).json({ message: 'Purchase itemwise not found' });
 
         res.status(200).json({
             message: 'Purchase itemwise updated successfully',
