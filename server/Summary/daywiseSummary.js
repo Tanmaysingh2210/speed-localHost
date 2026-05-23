@@ -1,9 +1,8 @@
 import LoadOut from '../models/transaction/LoadOut.js';
 import LoadIn from '../models/transaction/loadIn.js';
-import S_sheet from '../models/transaction/s_sheet.js';
 import { Item } from '../models/SKU.js';
 import Salesman from '../models/salesman.js';
-import CashCredit from '../models/transaction/CashCredit.js';
+import CashCredit from '../models/transaction/Settlement.js';
 import Rates from '../models/rates.js';
 
 

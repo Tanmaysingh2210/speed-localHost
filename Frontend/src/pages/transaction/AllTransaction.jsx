@@ -66,9 +66,9 @@ const AllTransaction = () => {
       ).join(", ");
     }
 
-    if (t.type === "Cash" || t.type === "Credit") {
-      return `₹${t.value} | Tax ₹${t.tax} | Ref ₹${t.ref || 0}`;
-    }
+    // if (t.type === "Cash" || t.type === "Credit") {
+    //   return `₹${t.value} | Tax ₹${t.tax} | Ref ₹${t.ref || 0}`;
+    // }
 
     return "";
   };
@@ -221,11 +221,11 @@ const AllTransaction = () => {
         state: { editMode: true, editData: transaction }
       });
     }
-    else if (transaction.type === 'Cash' || transaction.type === 'Credit') {
-      navigate('/transaction/cash-credit', {
-        state: { editMode: true, editData: transaction }
-      });
-    }
+    // else if (transaction.type === 'Cash' || transaction.type === 'Credit') {
+    //   navigate('/transaction/cash-credit', {
+    //     state: { editMode: true, editData: transaction }
+    //   });
+    // }
   };
 
   const handleDelete = async (id, type) => {
@@ -237,9 +237,10 @@ const AllTransaction = () => {
         await deleteLoadout(id);
       } else if (type === 'Load In') {
         await deleteLoadin(id);
-      } else if (type === 'Cash' || type === 'Credit') {
-        await deleteCash_credit(id);
       }
+      //  else if (type === 'Cash' || type === 'Credit') {
+      //   await deleteCash_credit(id);
+      // }
 
       setTransactions(transactions.filter(t => t._id !== id));
     } catch (error) {
@@ -312,10 +313,10 @@ const AllTransaction = () => {
     if (find.type === "all") {
       try {
         setLoading(true);
-        const [loadoutRes, loadinRes, cashRes] = await Promise.allSettled([
+        const [loadoutRes, loadinRes] = await Promise.allSettled([
           getLoadout(payload),
           getLoadIn(payload),
-          getCash_credit(payload),
+          // getCash_credit(payload),
         ]);
 
         const newTransactions = [];
@@ -332,18 +333,18 @@ const AllTransaction = () => {
           console.warn('Loadin fetch failed:', loadinRes.reason);
         }
 
-        if (cashRes.status === 'fulfilled' && Array.isArray(cashRes.value)) {
-          cashRes.value.forEach((record) => {
-            newTransactions.push({
-              ...record,
-              type: record.crNo === 1 ? 'Cash' : 'Credit',
-              id: `${record._id}-cashcredit`
-            });
-          });
-          console.log("newTransaction", newTransactions)
-        } else if (cashRes.status === 'rejected') {
-          console.warn('CashCredit fetch failed:', cashRes.reason);
-        }
+        // if (cashRes.status === 'fulfilled' && Array.isArray(cashRes.value)) {
+        //   cashRes.value.forEach((record) => {
+        //     newTransactions.push({
+        //       ...record,
+        //       type: record.crNo === 1 ? 'Cash' : 'Credit',
+        //       id: `${record._id}-cashcredit`
+        //     });
+        //   });
+        //   console.log("newTransaction", newTransactions)
+        // } else if (cashRes.status === 'rejected') {
+        //   console.warn('CashCredit fetch failed:', cashRes.reason);
+        // }
 
         if (newTransactions.length === 0) {
           showToast('No records found for the selected criteria', 'error');
@@ -519,7 +520,6 @@ const AllTransaction = () => {
                 <option value="all">All</option>
                 <option value="loadout">Load Out</option>
                 <option value="loadin">Load In</option>
-                <option value="cash-credit">Cash/Credit</option>
               </select>
             </div>
             <div className="form-group">

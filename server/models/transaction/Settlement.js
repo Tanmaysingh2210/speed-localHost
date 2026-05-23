@@ -1,18 +1,15 @@
 import mongoose from 'mongoose';
 
-const cash_creditSchema = new mongoose.Schema({
-    crNo: {
-        type: Number,
-        required: true
-    },
+const SettlementSchema = new mongoose.Schema({
     salesmanCode: { type: String, required: true },
     trip: { type: Number, required: true },
     date: { type: Date, required: true },
-    value: { type: Number, required: true },
-    tax: { type: Number },
-    ref: { type: Number },
     cashDeposited: { type: Number },
     chequeDeposited: { type: Number },
+    credit: { type: Number },
+    tax: { type: Number },
+    ref: { type: Number },
+    schm: { type: Number, default: 0 },
     remark: { type: String },
     depo: {
         type: mongoose.Schema.Types.ObjectId,
@@ -21,4 +18,4 @@ const cash_creditSchema = new mongoose.Schema({
     },
 }, { timestamps: false })
 
-export default mongoose.model('Transaction_cash_credit', cash_creditSchema);
+export default mongoose.model('Transaction_Settlement', SettlementSchema);

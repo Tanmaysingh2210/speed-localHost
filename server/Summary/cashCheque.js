@@ -1,4 +1,4 @@
-import CashCredit from '../models/transaction/CashCredit.js';
+import CashCredit from '../models/transaction/Settlement.js';
 import Salesman from '../models/salesman.js';
 
 export const CashChequeSummary = async (req, res) => {

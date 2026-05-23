@@ -32,7 +32,7 @@ const ItemWiseSummary = () => {
             const res = await api.post('/summary/itemwise', period);
             if (res?.data?.success) {
                 setSummary(res?.data?.data);
-                setGrandTotal(res?.data?.grandTotal.amount)
+                setGrandTotal(res?.data?.grandTotal);
             }
             showToast("item-wise summary fetch successfull", 'success');
 
@@ -55,13 +55,6 @@ const ItemWiseSummary = () => {
         startRef.current?.focus();
     }, []);
 
-
-    const grandQty = summary.reduce(
-        (sum, item) => sum + Number(item.qty || 0), 0
-    );
-    const grandAmt = summary.reduce(
-        (sum, item) => sum + Number(item.amount || 0), 0
-    );
 
     const { depos } = useDepo();
     const { user } = useAuth();
@@ -108,19 +101,21 @@ const ItemWiseSummary = () => {
             i + 1,
             r.itemCode,
             r.name,
-            r.qty,
+            r.cases,
+            r.bottles,
             r.amount
         ]);
 
         tableData.push([
             "", "", "TOTAL",
-            grandQty.toFixed(2),
-            grandAmt.toFixed(2)
+            grandTotal?.grandTotalCases ?? 0,
+            grandTotal?.grandTotalBottles ?? 0,
+            grandTotal?.amount?.toFixed(2) ?? "0.00"
         ])
 
         autoTable(doc, {
             startY: 35,
-            head: [["SL", "ITEM CODE", "NAME", "QUANTITY", "AMOUNT"]],
+            head: [["SL", "ITEM CODE", "NAME", "CASE SALE", "BOTTLE SALE", "AMOUNT"]],
             body: tableData,
             styles: { fontSize: 9 },
             headStyles: { fillColor: [0, 0, 0] },
@@ -175,7 +170,7 @@ const ItemWiseSummary = () => {
         sheet.getCell("B3").font = { size: 11 };
         sheet.getCell("B5").font = { bold: true };
         sheet.getRow(7).values = [
-            "SL", "ITEM CODE", "NAME", "QUANTITY", "AMOUNT"
+            "SL", "ITEM CODE", "NAME", "CASE SALE", "BOTTLE SALE", "AMOUNT"
         ];
 
         sheet.getRow(7).font = { bold: true };
@@ -184,7 +179,8 @@ const ItemWiseSummary = () => {
                 i + 1,
                 r.itemCode,
                 r.name,
-                r.qty,
+                r.cases,
+                r.bottles,
                 r.amount
             ]);
         });
@@ -193,8 +189,9 @@ const ItemWiseSummary = () => {
             "",
             "",
             "TOTAL",
-            grandQty.toFixed(2),
-            grandAmt.toFixed(2)
+            grandTotal?.grandTotalCases ?? 0,
+            grandTotal?.grandTotalBottles ?? 0,
+            grandTotal?.amount?.toFixed(2) ?? "0.00"
         ]);
         totalRow.eachCell(cell => {
             cell.border = {
@@ -209,6 +206,7 @@ const ItemWiseSummary = () => {
             { width: 6 },
             { width: 14 },
             { width: 30 },
+            { width: 14 },
             { width: 14 },
             { width: 14 }
         ];
@@ -257,7 +255,6 @@ const ItemWiseSummary = () => {
             }
         }
     }
-    let sumQty = 0;
 
     return (
         <div className='trans'>
@@ -307,10 +304,11 @@ const ItemWiseSummary = () => {
             </div>
             <div className="trans-container set-margin">
                 <div className="all-table">
-                    <div className="all-row2 header">
+                    <div className="all-row3 header">
                         <div>CODE</div>
                         <div>NAME</div>
-                        <div>QUANTITY</div>
+                        <div>CASE SALE</div>
+                        <div>BOTTLE SALE</div>
                         <div>AMOUNT</div>
                     </div>
                     {loading && (
@@ -332,23 +330,23 @@ const ItemWiseSummary = () => {
                         )
                     }
                     {summary.map((p, i) => {
-
-                        sumQty = sumQty + p.qty;
                         return (
-                            <div key={i} className="all-row2">
+                            <div key={i} className="all-row3">
                                 <div>{p.itemCode}</div>
                                 <div>{p.name}</div>
-                                <div>{p.qty}</div>
+                                <div>{p.cases}</div>
+                                <div>{p.bottles}</div>
                                 <div>₹ {p.amount}</div>
                             </div>
                         )
                     })}
-                    {summary.length > 0 && (
-                        <div className="all-row4 total-row">
+                    {summary.length > 0 && grandTotal && (
+                        <div className="all-row3 total-row">
                             <div></div>
                             <div><strong>TOTAL</strong></div>
-                            <div> {sumQty} </div>
-                            <div><strong>₹ {grandTotal.toFixed(2)}</strong></div>
+                            <div><strong>{grandTotal.grandTotalCases}</strong></div>
+                            <div><strong>{grandTotal.grandTotalBottles}</strong></div>
+                            <div><strong>₹ {grandTotal.amount?.toFixed(2)}</strong></div>
                         </div>
                     )}
 

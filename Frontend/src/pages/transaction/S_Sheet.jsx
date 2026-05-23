@@ -23,7 +23,6 @@ const S_Sheet = () => {
   const { salesmans } = useSalesman();
 
   const [sheetData, setSheetData] = useState(null);
-  const [discount, setDiscount] = useState("");    
   const { items } = useSKU();
 
   const [showItemModal, setShowItemModal] = useState(false);
@@ -63,7 +62,23 @@ const S_Sheet = () => {
     salesmanCode: "",
     date: "",
     trip: 1,
-    schm: ""
+    schm: "",
+    ref: "",
+    cashDeposited: "",
+    chequeDeposited: "",
+    credit: "",
+    tax: "",
+    remark: ""
+  });
+
+  const [editableFields, setEditableFields] = useState({
+    schm: "",
+    ref: "",
+    cashDeposited: "",
+    chequeDeposited: "",
+    credit: "",
+    tax: "",
+    remark: ""
   });
 
   const exportSettlementPDF = async () => {
@@ -204,30 +219,57 @@ const S_Sheet = () => {
     saveAs(new Blob([buffer]), "settlement-sheet.xlsx");
   };
 
-  const handleSaveDiscount = async () => {
-    if (!discount) {
-      alert("Enter discount before saving");
+  const handleSaveSettlement = async () => {
+    const hasAnyField = Object.values(editableFields).some(val => val !== "");
+    if (!hasAnyField) {
+      showToast("Enter at least one field to save", "error");
       return;
     }
 
     try {
-      await api.post('/transaction/settlement/save-schm', {
+      const updatePayload = {
         salesmanCode: sheetData.salesmanCode.trim().toUpperCase(),
         date: sheetData.date,
         trip: sheetData.trip,
-        schm: Number(discount)
-      });
+      };
 
-      showToast("Discount saved successfully", "success");
+      if (editableFields.schm !== "") updatePayload.schm = Number(editableFields.schm);
+      if (editableFields.ref !== "") updatePayload.ref = Number(editableFields.ref);
+      if (editableFields.cashDeposited !== "") updatePayload.cashDeposited = Number(editableFields.cashDeposited);
+      if (editableFields.chequeDeposited !== "") updatePayload.chequeDeposited = Number(editableFields.chequeDeposited);
+      if (editableFields.credit !== "") updatePayload.credit = Number(editableFields.credit);
+      if (editableFields.tax !== "") updatePayload.tax = Number(editableFields.tax);
+      if (editableFields.remark !== "") updatePayload.remark = editableFields.remark;
 
-      setSheetData(prev => ({
-        ...prev,
-        schm: Number(discount)
-      }));
+      const res = await api.post('/transaction/settlement/update', updatePayload);
+
+      showToast(res.data.message, "success");
+
+      // Re-fetch settlement to get accurate server-computed values
+      try {
+        const freshData = await getSettlement({
+          salesmanCode: sheetData.salesmanCode.trim().toUpperCase(),
+          date: sheetData.date,
+          trip: sheetData.trip
+        });
+        setSheetData(freshData);
+        // Repopulate editable fields from fresh data
+        setEditableFields({
+          schm: freshData.schm || "",
+          ref: freshData.cashCreditDetails?.ref || "",
+          cashDeposited: freshData.cashCreditDetails?.cashDeposited || "",
+          chequeDeposited: freshData.cashCreditDetails?.chequeDeposited || "",
+          credit: freshData.cashCreditDetails?.creditSale || "",
+          tax: freshData.tax || "",
+          remark: freshData.remark || ""
+        });
+      } catch (refetchErr) {
+        console.error("Failed to refresh data after save", refetchErr);
+      }
 
     } catch (err) {
-      console.error(err?.data.message);
-      showToast("Failed to save discount", "error");
+      console.error(err);
+      showToast(err?.response?.data?.message || "Failed to save settlement data", "error");
     }
   };
 
@@ -247,8 +289,20 @@ const S_Sheet = () => {
         trip: Number(sheet.trip) || 1
       });
 
-      setSheetData(data); 
-      setDiscount(data.schm || "");
+      setSheetData(data);
+
+      console.log(data);
+
+      // Load existing values into editable fields
+      setEditableFields({
+        schm: data.schm || "",
+        ref: data.cashCreditDetails?.ref || "",
+        cashDeposited: data.cashCreditDetails?.cashDeposited || "",
+        chequeDeposited: data.cashCreditDetails?.chequeDeposited || "",
+        credit: data.cashCreditDetails?.creditSale || "",
+        tax: data.tax || "",
+        remark: data.remark || ""
+      });
 
       setSheet({
         salesmanCode: "",
@@ -263,6 +317,22 @@ const S_Sheet = () => {
 
   let totalA = 0;
   let totalB = 0;
+
+  // Compute derived values from current editable fields
+  const netSale = sheetData?.totals?.NetSale || 0;
+  const currentRef = editableFields.ref !== "" ? Number(editableFields.ref) : (sheetData?.cashCreditDetails?.ref || 0);
+  const currentSchm = editableFields.schm !== "" ? Number(editableFields.schm) : (sheetData?.schm || 0);
+  const currentCashDeposited = editableFields.cashDeposited !== "" ? Number(editableFields.cashDeposited) : (sheetData?.cashCreditDetails?.cashDeposited || 0);
+  const currentChequeDeposited = editableFields.chequeDeposited !== "" ? Number(editableFields.chequeDeposited) : (sheetData?.cashCreditDetails?.chequeDeposited || 0);
+  const currentCredit = editableFields.credit !== "" ? Number(editableFields.credit) : (sheetData?.cashCreditDetails?.creditSale || 0);
+  const totalRefund = sheetData?.totals?.totalRefund || 0;
+
+  const computedTotalA = netSale - currentRef;
+  const computedCashSale = netSale - currentSchm;
+  const computedTotalDeposited = parseFloat((currentCashDeposited + currentChequeDeposited + currentCredit).toFixed(2));
+  const computedTotalPayable = netSale - totalRefund - currentSchm - currentRef;
+  const computedShortOrExcess = parseFloat((computedTotalDeposited - computedTotalPayable).toFixed(2));
+  const computedCashShort = computedShortOrExcess < 0 ? -computedShortOrExcess : 0;
 
   const calculateTotalA = (sale, ref) => {
     if (!sale || !ref) return;
@@ -405,9 +475,9 @@ const S_Sheet = () => {
                 <div className="form-group">
                   <label>DEP/REF</label>
                   <input
-                    readOnly
-                    value={sheetData?.cashCreditDetails?.ref || 0}
+                    value={editableFields.ref}
                     type="number"
+                    onChange={(e) => setEditableFields({ ...editableFields, ref: e.target.value })}
                     placeholder="Enter"
                   />
                 </div>
@@ -415,7 +485,7 @@ const S_Sheet = () => {
                   <label>TOTAL A</label>
                   <input
                     readOnly
-                    value={calculateTotalA(sheetData?.totals?.NetSale, sheetData?.cashCreditDetails?.ref) || 0}
+                    value={sheetData ? computedTotalA : 0}
                     type="number"
                   />
                 </div>
@@ -425,8 +495,8 @@ const S_Sheet = () => {
                   <label>SMP,DSC,INCM,SCME</label>
                   <input
                     type="number"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
+                    value={editableFields.schm}
+                    onChange={(e) => setEditableFields({ ...editableFields, schm: e.target.value })}
                     placeholder="Enter discount"
                   />
                 </div>
@@ -441,9 +511,10 @@ const S_Sheet = () => {
                 <div className="form-group">
                   <label>CREDIT SALE</label>
                   <input
-                    readOnly
                     type="number"
-                    value={sheetData?.cashCreditDetails?.creditSale || 0}
+                    placeholder='Enter Credit Sale'
+                    value={editableFields.credit}
+                    onChange={(e) => setEditableFields({ ...editableFields, credit: e.target.value })}
                   />
                 </div>
               </div>
@@ -456,24 +527,26 @@ const S_Sheet = () => {
                   <input
                     readOnly
                     type="number"
-                    value={sheetData?.totals?.NetSale - discount}
+                    value={sheetData ? computedCashSale : 0}
                   />
                 </div>
                 <div className="form-group">
                   <label>Cash Deposited</label>
                   <input
-                    readOnly
                     type="number"
-                    value={(sheetData?.cashCreditDetails?.cashDeposited) || 0}
+                    placeholder='Enter Cash Deposited'
+                    value={editableFields.cashDeposited}
+                    onChange={(e) => setEditableFields({ ...editableFields, cashDeposited: e.target.value })}
                   />
                 </div>
 
                 <div className="form-group">
                   <label>Cheq.Desposited</label>
                   <input
-                    readOnly
                     type="number"
-                    value={(sheetData?.cashCreditDetails?.chequeDeposited) || 0}
+                    placeholder='Enter Cheq.Desposited'
+                    value={editableFields.chequeDeposited}
+                    onChange={(e) => setEditableFields({ ...editableFields, chequeDeposited: e.target.value })}
                   />
                 </div>
               </div>
@@ -483,7 +556,7 @@ const S_Sheet = () => {
                   <input
                     readOnly
                     type="number"
-                    value={sheetData?.totals?.totalDeposited || 0}
+                    value={sheetData ? computedTotalDeposited : 0}
                   />
                 </div>
                 <div className="form-group">
@@ -491,9 +564,7 @@ const S_Sheet = () => {
                   <input
                     readOnly
                     type="number"
-                    value={
-                      (sheetData?.totals?.shortOrExcess < 0) ?
-                        -(sheetData?.totals?.shortOrExcess) : 0}
+                    value={sheetData ? computedCashShort : 0}
                   />
                 </div>
                 <div className="form-group">
@@ -501,24 +572,25 @@ const S_Sheet = () => {
                   <input
                     readOnly
                     type="number"
-                    className={sheetData?.totals?.shortOrExcess > 0 ? "excess" : "short"}
                     style={{
-                      color: sheetData?.totals?.shortOrExcess > 0 ? 'green' :
-                        sheetData?.totals?.shortOrExcess < 0 ? 'red' : 'black'
+                      color: computedShortOrExcess > 0 ? '#22c55e' : computedShortOrExcess < 0 ? '#ef4444' : 'inherit',
+                      fontWeight: computedShortOrExcess !== 0 ? 'bold' : 'normal'
                     }}
-                    value={sheetData?.totals?.shortOrExcess || 0}
+                    value={sheetData ? computedShortOrExcess : 0}
                   />
                 </div>
               </div>
-              <button
-                className="btn btn-sm"
-                onClick={() => {
-                  setSelectedItems(sheetData.items);
-                  setShowItemModal(true);
-                }}
-              >
-                View Item Breakdown
-              </button>
+              <div style={{ marginTop: "-10px" }}>
+                <div className="form-group" style={{ marginBottom: "0px" }}>
+                  <label style={{ marginBottom: "2px" }}>Remark</label>
+                  <input
+                    type="text"
+                    value={editableFields.remark}
+                    onChange={(e) => setEditableFields({ ...editableFields, remark: e.target.value })}
+                    placeholder="Enter remark"
+                  />
+                </div>
+              </div>
             </div>
 
           </div>
@@ -534,16 +606,30 @@ const S_Sheet = () => {
         >
           {loading ? "Loading..." : "Find"}
         </button>
+
+
         {sheetData && (
-          <button
-            className="trans-submit-btn"
-            onClick={handleSaveDiscount}
-          >
-            Save Discount
-          </button>
+          <>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                setSelectedItems(sheetData.items);
+                setShowItemModal(true);
+              }}
+            >
+              View Item Breakdown
+            </button>
+
+            <button
+              className="trans-submit-btn"
+              onClick={handleSaveSettlement}
+            >
+              Save Settlement
+            </button>
+          </>
         )}
         {sheetData && (
-          <div style={{ display: "flex", gap: "10px"}}>
+          <div style={{ display: "flex", gap: "10px" }}>
             <button className="export-btn pdf trans-submit-btn" onClick={exportSettlementPDF}>
               📄 Export PDF
             </button>
@@ -559,7 +645,7 @@ const S_Sheet = () => {
         open={showItemModal}
         onClose={() => setShowItemModal(false)}
         items={selectedItems}
-        skuItems={items}   
+        skuItems={items}
       />
     </div >
   )

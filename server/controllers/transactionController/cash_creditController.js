@@ -1,8 +1,8 @@
-import CashCredit from '../../models/transaction/CashCredit.js';
+import CashCredit from '../../models/transaction/Settlement.js';
 
 export const createCashCredit = async (req, res) => {
     try {
-        const { crNo, date, salesmanCode, trip, value, ref, cashDeposited, chequeDeposited, tax, remark } = req.body;
+        const { crNo, date, salesmanCode, trip, value, ref, cashDeposited, chequeDeposited, tax, remark, schm } = req.body;
 
         if (!crNo || !date || !salesmanCode || !trip || !value) return res.status(400).json({ message: "All fields are required" });
 
@@ -25,6 +25,7 @@ export const createCashCredit = async (req, res) => {
             depo,
             cashDeposited,
             chequeDeposited,
+            schm,
             remark
         });
 

@@ -31,7 +31,7 @@ export const ItemBreakdownModal = ({ open, onClose, items, skuItems }) => {
                                 <td>{it.itemCode}</td>
                                 <td>{getItemName(it.itemCode)}</td>
                                 <td>{it.loadedQty}</td>
-                                <td>{it.returnedQty}</td>
+                                <td>{(!it.returnedQty || it.returnedQty === "0.0") ? "—" : it.returnedQty}</td>
                                 <td>{it.finalQty}</td>
                                 <td>₹{it.finalPrice}</td>
                                 <td>₹{it.amount}</td>

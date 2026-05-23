@@ -2,6 +2,7 @@ import LoadOut from '../models/transaction/LoadOut.js';
 import LoadIn from '../models/transaction/loadIn.js';
 import Rates from '../models/rates.js';
 import { Item } from '../models/SKU.js';
+import { normalizeCasesBottles, seperateCrate_Bottle } from '../utils/normalizeQty.js';
 
 export const ItemWiseSummary = async (req, res) => {
     const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -33,8 +34,10 @@ export const ItemWiseSummary = async (req, res) => {
                 itemMap.set(code, {
                     itemCode: code,
                     name: i.name,
-                    qty: 0,
-                    amount: 0
+                    cases: 0,
+                    bottles: 0,
+                    amount: 0,
+                    packOf: i.packOf || 0
                 });
             }
         }
@@ -64,17 +67,28 @@ export const ItemWiseSummary = async (req, res) => {
             for (const item of loadout.items) {
                 const rate = getRateforDate(item.itemCode, loadout.date);
                 if (!rate) continue;
+                const it = itemMap.get(normalize(item.itemCode));
+                if (!it) continue;
+                const { cases, bottles } = seperateCrate_Bottle(item.qty, it?.packOf);
 
-                const baseAmount = rate.basePrice * item.qty;
-                const taxableAmount = baseAmount - (baseAmount * ((rate.perDisc || 0) / 100));
-                const taxAmount = taxableAmount * ((rate.perTax || 0) / 100);
+                const basePrice = rate.basePrice;
+                const taxablePrice = basePrice - (basePrice * ((rate.perDisc || 0) / 100));
+                const tax = taxablePrice * ((rate.perTax || 0) / 100);
 
-                const finalAmount = taxableAmount + taxAmount;
+                const finalPrice = taxablePrice + tax;
+                const ratePerBottle = finalPrice / it.packOf;
+
+                const caseAmount = finalPrice * cases;
+                const bottleAmount = ratePerBottle * bottles;
+                const finalAmount = parseFloat((caseAmount + bottleAmount).toFixed(2));
 
                 const agg = itemMap.get(normalize(item.itemCode));
                 if (!agg) continue;
-                agg.qty += item.qty;
+
                 agg.amount += finalAmount;
+                agg.cases += cases;
+                agg.bottles += bottles;
+                agg.packOf = it?.packOf || 0;
             }
         }
 
@@ -83,32 +97,56 @@ export const ItemWiseSummary = async (req, res) => {
                 const rate = getRateforDate(item.itemCode, loadin.date);
                 if (!rate) continue;
 
-                const baseAmount = rate.basePrice * ((item.Filled || 0) + (item.Burst || 0));
-                const taxableAmount = baseAmount - (baseAmount * ((rate.perDisc || 0) / 100));
-                const taxAmount = taxableAmount * ((rate.perTax || 0) / 100);
+                const it = itemMap.get(normalize(item.itemCode));
+                if (!it) continue;
 
-                const finalAmount = taxableAmount + taxAmount;
+                const { cases: filledCases, bottles: filledBottles } = seperateCrate_Bottle(item.Filled, it?.packOf);
+                const { cases: burstCases, bottles: burstBottles } = seperateCrate_Bottle(item.Burst, it?.packOf);
+
+                const cases = filledCases + burstCases;
+                const bottles = filledBottles + burstBottles;
+
+                const basePrice = rate.basePrice;
+                const taxablePrice = basePrice - (basePrice * ((rate.perDisc || 0) / 100));
+                const tax = taxablePrice * ((rate.perTax || 0) / 100);
+
+                const finalPrice = taxablePrice + tax;
+                const ratePerBottle = finalPrice / it.packOf;
+
+                const caseAmount = finalPrice * cases;
+                const bottleAmount = ratePerBottle * bottles;
+                const finalAmount = parseFloat((caseAmount + bottleAmount).toFixed(2));
 
                 const agg = itemMap.get(normalize(item.itemCode));
                 if (!agg) continue;
-                agg.qty -= ((item.Filled || 0) + (item.Burst || 0));
+
+
+                agg.cases -= cases ? cases : 0;
+                agg.bottles -= bottles ? bottles : 0;
                 agg.amount -= finalAmount;
+                agg.packOf = it?.packOf || 0;
             }
         }
 
         const summary = [];
-        let grandTotalQty = 0;
+        let grandTotalCases = 0;
+        let grandTotalBottles = 0;
         let grandTotalAmount = 0;
 
         for (const [itemCode, data] of itemMap) {
+
+            const { cases, bottles } = normalizeCasesBottles(data.cases, data.bottles, data.packOf);
+
             summary.push({
                 itemCode,
                 name: data.name,
-                qty: data.qty,
-                amount: parseFloat(data.amount.toFixed(2))
+                cases: cases,
+                bottles: bottles,
+                amount: parseFloat(data.amount).toFixed(2)
             });
 
-            grandTotalQty += data.qty;
+            grandTotalCases += cases;
+            grandTotalBottles += bottles;
             grandTotalAmount += data.amount;
         }
 
@@ -118,7 +156,8 @@ export const ItemWiseSummary = async (req, res) => {
             success: true,
             data: summary,
             grandTotal: {
-                qty: grandTotalQty,
+                grandTotalCases,
+                grandTotalBottles,
                 amount: parseFloat(grandTotalAmount.toFixed(2))
             }
         });

@@ -6,10 +6,12 @@ import loadinRoutes from './transactionRoutes/loadinRoutes.js';
 import cashcreditRoutes from './transactionRoutes/cashcreditRoutes.js';
 import LoadOut from '../models/transaction/LoadOut.js';
 import Loadin from '../models/transaction/loadIn.js';
-import CashCredit from '../models/transaction/CashCredit.js';
+import Settlement from '../models/transaction/Settlement.js';
 import Rate from '../models/rates.js';
 import S_sheet from '../models/transaction/s_sheet.js';
 import Depo from '../models/depoModal.js';
+import { seperateCrate_Bottle, normalizeCasesBottles } from '../utils/normalizeQty.js';
+import { Item } from '../models/SKU.js';
 
 router.use('/loadout', loadoutRoutes);
 router.use('/loadin', loadinRoutes);
@@ -26,12 +28,12 @@ router.post("/settlement", async (req, res) => {
         const depo = req.user?.depo;
         const saleDate = new Date(date);
 
-        const [s_sheet, loadout, loadin, cashCredit, rates] = await Promise.all([
-            S_sheet.findOne({ salesmanCode, date, trip, depo }),
+        const [loadout, loadin, settlement, rates, items] = await Promise.all([
             LoadOut.findOne({ salesmanCode, date, trip, depo }),
             Loadin.findOne({ salesmanCode, date, trip, depo }),
-            CashCredit.find({ salesmanCode, date, trip, depo }),
-            Rate.find({ depo, date: { $lte: saleDate } }).sort({ date: 1 })
+            Settlement.find({ salesmanCode, date, trip, depo }),
+            Rate.find({ depo, date: { $lte: saleDate } }).sort({ date: 1 }),
+            Item.find({ depo })
         ]);
 
         if (!loadout)
@@ -74,18 +76,31 @@ router.post("/settlement", async (req, res) => {
             const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
             const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
 
+            const item = items.find((i) => i.code === lo.itemCode);
+            if (!item) { console.log("Item not found"); continue; }
+            const pricePerBottle = parseFloat(finalPrice / item?.packOf).toFixed(2);
+
+            const { cases, bottles } = seperateCrate_Bottle(lo.qty, item.packOf);
+            console.log("cases", cases);
+            console.log("bottles", bottles);
+
             if (!settlementMap.get(lo.itemCode)) {
                 settlementMap.set(lo.itemCode, {
                     itemCode: lo.itemCode,
+                    cases,
+                    bottles,
                     loadedQty: lo.qty,
-                    returnedQty: 0,
+                    returnedQty: "0.0",
+                    returnedCasesTotal: 0,
+                    returnedBottlesTotal: 0,
                     finalQty: lo.qty,
-
+                    finalCase: cases,
+                    finalBottle: bottles,
                     basePrice,
                     tax,
                     disc,
                     finalPrice,
-
+                    pricePerBottle,
                     taxAmount: 0,
                     discAmt: 0,
                     amount: 0
@@ -95,49 +110,102 @@ router.post("/settlement", async (req, res) => {
 
         if (loadin) {
             for (const li of loadin.items) {
+                console.log("li", li);
+
                 const rate = getRate(li.itemCode);
                 if (!rate) continue;
+
+                const item = items.find((i) => i.code === li.itemCode);
+                if (!item) { console.log("Item not found"); continue; }
+
 
                 const base = rate.basePrice;
                 const disc = base * (rate.perDisc || 0) / 100;
                 const tax = (base - disc) * (rate.perTax || 0) / 100;
                 const price = base - disc + tax;
+                const pricePerBottle = parseFloat((price / item?.packOf)).toFixed(2);
 
-                if (!li.Emt) {
-                    const returned = (li.Filled || 0) + (li.Burst || 0);
+                // Emt is stored as String in DB — "0" is truthy, so check numerically
+                const emtVal = parseFloat(li.Emt) || 0;
+
+                if (emtVal === 0) {
+                    const { cases: filledCases, bottles: filledBottles } = seperateCrate_Bottle(parseFloat(li.Filled) || 0, item.packOf);
+                    const { cases: burstCases, bottles: burstBottles } = seperateCrate_Bottle(parseFloat(li.Burst) || 0, item.packOf);
+
+                    const { cases: returnedCases, bottles: returnedBottles } = seperateCrate_Bottle(`${filledCases + burstCases}.${filledBottles + burstBottles}`, item.packOf);
+
+
                     const agg = settlementMap.get(li.itemCode);
                     if (!agg) {
                         settlementMap.set(li.itemCode, {
                             itemCode: li.itemCode,
                             loadedQty: 0,
-                            returnedQty: returned,
-                            finalQty: 0 - returned,
-
+                            returnedQty: `${returnedCases}.${returnedBottles}`,
+                            finalQty: `-${returnedCases}.${returnedBottles}`,
+                            finalCase: -returnedCases,
+                            finalBottle: -returnedBottles,
                             basePrice: base,
                             tax,
                             disc,
-                            finalPrice: ((parseFloat(price)).toFixed(2)),
-
+                            pricePerBottle,
+                            finalPrice: parseFloat(price).toFixed(2),
                             taxAmount: 0,
                             discAmt: 0,
                             amount: 0
                         })
                     } else {
-                        agg.returnedQty += returned;
-                        agg.finalQty -= returned;
+
+                        // Accumulate returned cases/bottles numerically across multiple loadin lines
+                        agg.returnedCasesTotal = (agg.returnedCasesTotal || 0) + returnedCases;
+                        agg.returnedBottlesTotal = (agg.returnedBottlesTotal || 0) + returnedBottles;
+
+                        let finalCases = parseInt(agg.cases) - agg.returnedCasesTotal;
+                        let finalBottles = parseInt(agg.bottles) - agg.returnedBottlesTotal;
+
+                        // Borrow from cases when bottles go negative
+                        const normalized = normalizeCasesBottles(finalCases, finalBottles, item.packOf);
+                        finalCases = normalized.cases;
+                        finalBottles = normalized.bottles;
+
+                        agg.finalBottle = finalBottles;
+                        agg.finalCase = finalCases;
+                        agg.returnedQty = `${agg.returnedCasesTotal}.${agg.returnedBottlesTotal}`;
+                        agg.finalQty = `${finalCases}.${finalBottles}`;
                     }
                 } else {
-                    totalRefund += li.Emt * price;
+                    const { cases: emtCases, bottles: emtBottles } = seperateCrate_Bottle(emtVal, item.packOf);
+                    totalRefund += parseFloat((emtCases * price + emtBottles * parseFloat(pricePerBottle)).toFixed(2));
                 }
             }
         }
 
         for (const entry of settlementMap.values()) {
             const finalQty = entry.finalQty;
+            console.log("finalQty", finalQty);
+            console.log("finalCase", entry.finalCase);
+            console.log("finalBottle", entry.finalBottle);
 
-            entry.amount = parseFloat((finalQty * entry.finalPrice).toFixed(2));
-            entry.discAmt = parseFloat((finalQty * entry.disc).toFixed(2));
-            entry.taxAmount = parseFloat((finalQty * entry.tax).toFixed(2));
+            const caseAmount = (entry.finalCase) * (entry.finalPrice);
+            const bottleAmount = (entry.finalBottle) * (entry.pricePerBottle);
+
+            console.log("caseAmount", caseAmount);
+            console.log("bottleAmount", bottleAmount);
+
+            const caseDisc = (entry.finalCase) * (entry.disc);
+            const bottleDisc = (entry.finalBottle) * (entry.disc);
+
+            console.log("caseDisc", caseDisc);
+            console.log("bottleDisc", bottleDisc);
+
+            const caseTax = (entry.finalCase) * (entry.tax);
+            const bottleTax = (entry.finalBottle) * (entry.tax);
+
+            console.log("caseTax", caseTax);
+            console.log("bottleTax", bottleTax);
+
+            entry.amount = parseFloat((caseAmount + bottleAmount).toFixed(2));
+            entry.discAmt = parseFloat((caseDisc + bottleDisc).toFixed(2));
+            entry.taxAmount = parseFloat((caseTax + bottleTax).toFixed(2));
 
             NetSale += entry.amount;
             totalDiscount += entry.discAmt;
@@ -149,36 +217,26 @@ router.post("/settlement", async (req, res) => {
         totalDiscount = parseFloat(totalDiscount.toFixed(2));
         totalRefund = parseFloat(totalRefund.toFixed(2));
 
-        let cashDeposited = 0;
-        let chequeDeposited = 0;
-        let ref = 0;
-        let creditSale = 0;
+        // settlement is an array (Settlement.find), grab first doc
+        const settlementDoc = settlement[0] || null;
+        let cashDeposited = parseFloat(settlementDoc?.cashDeposited || 0);
+        let chequeDeposited = parseFloat(settlementDoc?.chequeDeposited || 0);
+        let ref = parseFloat(settlementDoc?.ref || 0);
+        let creditSale = parseFloat(settlementDoc?.credit || 0);
+        let schm = parseFloat(settlementDoc?.schm || 0);
 
-        for (const cc of cashCredit) {
-            ref += cc.ref || 0;
-            if (cc.crNo === 1) {
-                cashDeposited += parseFloat((cc?.cashDeposited || 0).toFixed(2));
-                chequeDeposited += parseFloat((cc?.chequeDeposited || 0).toFixed(2));
-            } else {
-                creditSale += parseFloat((cc.value + (cc.value * (cc.tax || 0)) / 100).toFixed(2));
-            }
-        }
-
-        const totalPayable = NetSale - totalRefund - (s_sheet?.schm || 0) - ref;
-
+        const totalPayable = NetSale - totalRefund - schm - ref;
         const totalDeposited = parseFloat((cashDeposited + chequeDeposited + creditSale).toFixed(2));
-
         const shortOrExcess = parseFloat((totalDeposited - totalPayable).toFixed(2));
-
         const settlementItems = Array.from(settlementMap.values());
-
 
         return res.json({
             salesmanCode,
             date,
             trip,
-            schm: s_sheet ? s_sheet?.schm : 0,
+            schm,
             items: settlementItems,
+            remark: settlementDoc?.remark || "",
 
             totals: {
                 NetSale,
@@ -204,33 +262,33 @@ router.post("/settlement", async (req, res) => {
 
 
 
-router.post("/settlement/save-schm", async (req, res) => {
+router.post("/settlement/update", async (req, res) => {
     try {
-        const { salesmanCode, date, trip, schm } = req.body;
+        const { date, salesmanCode, trip, ref, cashDeposited, chequeDeposited, credit, tax, remark, schm } = req.body;
 
-        if (!salesmanCode || !date || !trip) {
-            return res.status(400).json({ message: "Missing fields" });
-        }
+        if (!date || !salesmanCode || !trip) return res.status(400).json({ message: "Required fields: date, salesmanCode, trip" });
 
         const depo = req.user?.depo;
 
-        const updated = await S_sheet.findOneAndUpdate(
+        // Build update object with only provided fields
+        const updateData = {};
+        if (cashDeposited !== undefined) updateData.cashDeposited = cashDeposited;
+        if (chequeDeposited !== undefined) updateData.chequeDeposited = chequeDeposited;
+        if (credit !== undefined) updateData.credit = credit;
+        if (tax !== undefined) updateData.tax = tax;
+        if (schm !== undefined) updateData.schm = schm;
+        if (remark !== undefined) updateData.remark = remark;
+        if (ref !== undefined) updateData.ref = ref;
+
+        const updated = await Settlement.findOneAndUpdate(
             { salesmanCode, date, trip, depo },
-            { $set: { schm } },
+            { $set: updateData },
             { upsert: true, new: true }
         );
 
-        return res.json({
-            success: true,
-            schm: updated.schm
-        });
-
+        res.status(201).json({ message: "settlement updated successfully", updated });
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            message: "Failed to save discount",
-            error: err.message
-        });
+        res.status(500).json({ message: "Error updating settlement", error: err.message });
     }
 });
 
