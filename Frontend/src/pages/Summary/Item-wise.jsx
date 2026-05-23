@@ -45,8 +45,6 @@ const ItemWiseSummary = () => {
         }
     }
 
-    console.log("summary is:", summary);
-
     const startRef = useRef(null);
     const endRef = useRef(null);
     const findRef = useRef(null);

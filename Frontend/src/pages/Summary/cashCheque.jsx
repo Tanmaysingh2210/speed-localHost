@@ -10,7 +10,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import pepsiLogo from "../../assets/pepsi_logo.png";
 import { useDepo } from '../../context/depoContext';
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/AuthContext';
 
 
 const CashChequeSummary = () => {
@@ -19,7 +19,8 @@ const CashChequeSummary = () => {
     const { FormatDate } = useTransaction();
     const [summary, setSummary] = useState([]);
     const [loading, setLoading] = useState(false);
-
+    const { showToast } = useToast();
+    
     const getSummary = async (e) => {
         e.preventDefault();
         if (!period.startDate || !period.endDate || period.startDate > period.endDate) {
@@ -294,10 +295,10 @@ const CashChequeSummary = () => {
                                 onKeyDown={(e) => handleKeyNav(e, "endDate")}
                             />
                         </div>
-                        
+
 
                         <div className="form-group pdf">
-                            
+
                             <button
                                 className="padd trans-submit-btn"
                                 disabled={loading}
@@ -309,7 +310,7 @@ const CashChequeSummary = () => {
 
                             </button>
 
-                             <button className="export-btn pdf padd trans-submit-btn" onClick={exportCashChequePDF}>
+                            <button className="export-btn pdf padd trans-submit-btn" onClick={exportCashChequePDF}>
                                 🖨️ Print
                             </button>
                             <button className="export-btn excel padd  pdf trans-submit-btn" onClick={exportSummaryExcel}>

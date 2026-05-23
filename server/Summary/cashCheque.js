@@ -1,5 +1,6 @@
-import CashCredit from '../models/transaction/Settlement.js';
+import Settlement from '../models/transaction/Settlement.js';
 import Salesman from '../models/salesman.js';
+
 
 export const CashChequeSummary = async (req, res) => {
     const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -16,8 +17,8 @@ export const CashChequeSummary = async (req, res) => {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
-        const [cashCredits, salesmans] = await Promise.all([
-            CashCredit.find({ depo: req.user?.depo, date: { $gte: start, $lte: end } }),
+        const [settlements, salesmans] = await Promise.all([
+            Settlement.find({ depo: req.user?.depo, date: { $gte: start, $lte: end } }),
             Salesman.find({ depo: req.user?.depo })
         ]);
 
@@ -28,14 +29,13 @@ export const CashChequeSummary = async (req, res) => {
 
         const summaryMap = new Map();
 
-        for (const cashcredit of cashCredits) {
-            if (cashcredit.crNo != 1) continue;
-            const dateKey = getDateKey(cashcredit.date);
-            const salesmanCode = cashcredit.salesmanCode.trim().toUpperCase();
+        for (const settle of settlements) {
+            const dateKey = getDateKey(settle.date);
+            const salesmanCode = settle.salesmanCode.trim().toUpperCase();
             const mapKey = `${dateKey} | ${salesmanCode}`;
 
-            const cash = cashcredit.cashDeposited || 0;
-            const cheque = cashcredit.chequeDeposited || 0;
+            const cash = settle.cashDeposited || 0;
+            const cheque = settle.chequeDeposited || 0;
 
             const total = cash + cheque;
             if (!summaryMap.has(mapKey)) {
