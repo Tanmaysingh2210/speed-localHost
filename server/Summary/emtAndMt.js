@@ -35,12 +35,13 @@ export const EmtAndMtSummary = async (req, res) => {
 
         const summaryMap = new Map();
 
-
         for (const loadout of loadouts) {
             let mt = 0;
             for (const item of loadout.items) {
                 const itemDoc = itemMap.get(item.itemCode.trim().toUpperCase());
                 if (!itemDoc) continue;
+
+                
                 if (itemDoc.container.toLowerCase() === "mt") {
                     mt += item.qty;
                 }

@@ -18,6 +18,7 @@ import summaryRoutes from './routes/summaryRoutes.js';
 import requireAuth from './middleware/requireAuth.js';
 import requireDepo from './middleware/requireDepo.js';
 import graphRoutes from './routes/graphRoutes.js';
+import mtRoutes from './routes/mtRoutes.js';
 
 connectDB();
 const app = express();
@@ -56,7 +57,7 @@ app.use('/purchase', purchaseRoutes);
 app.use('/graph', graphRoutes);
 app.use('/stock', stockRoutes);
 app.use('/summary', summaryRoutes);
-
+app.use('/mt', mtRoutes);
 
 
 const port = 3000;
