@@ -88,44 +88,85 @@ router.post("/settlement", async (req, res) => {
 
         for (let lo of loadout.items) {
 
-            const latestRate = getRate(lo.itemCode);
-            if (!latestRate) continue;
-
-            const basePrice = parseFloat((latestRate?.basePrice || 0).toFixed(2));
-            const disc = basePrice * (latestRate?.perDisc || 0) / 100;
-            const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
-            const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
-
             const item = items.find((i) => i.code === lo.itemCode);
             if (!item) { console.log("Item not found"); continue; }
-            const pricePerBottle = parseFloat(finalPrice / item?.packOf).toFixed(2);
 
             const { cases, bottles } = seperateCrate_Bottle(lo.qty, item.packOf);
             console.log("cases", cases);
             console.log("bottles", bottles);
 
-            if (!settlementMap.get(lo.itemCode)) {
-                settlementMap.set(lo.itemCode, {
-                    itemCode: lo.itemCode,
-                    cases,
-                    bottles,
-                    loadedQty: lo.qty,
-                    returnedQty: "0.0",
-                    returnedCasesTotal: 0,
-                    returnedBottlesTotal: 0,
-                    finalQty: lo.qty,
-                    finalCase: cases,
-                    finalBottle: bottles,
-                    basePrice,
-                    tax,
-                    disc,
-                    finalPrice,
-                    pricePerBottle,
-                    taxAmount: 0,
-                    discAmt: 0,
-                    amount: 0
-                })
+
+            if (item.container.toLowerCase() === "mt" || item.container.toLowerCase() == "emt") {
+                const latestMtPrice = getMtRate(lo.itemCode);
+                if (!latestMtPrice) continue;
+
+                const basePrice = parseFloat(((latestMtPrice.cratePrice || 0) + (latestMtPrice.emptyBottlePrice || 0) * (item.packOf || 24) + (latestMtPrice.drinkPrice || 0)).toFixed(2));
+                const disc = latestMtPrice.drinkPrice * (latestRate?.perDisc || 0) / 100;
+                const tax = (latestMtPrice.drinkPrice - disc) * (latestRate?.perTax || 0) / 100;
+                const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
+
+                const pricePerBottle = parseFloat(finalPrice / item?.packOf).toFixed(2);
+
+                if (!settlementMap.get(lo.itemCode)) {
+                    settlementMap.set(lo.itemCode, {
+                        itemCode: lo.itemCode,
+                        cases,
+                        bottles,
+                        loadedQty: lo.qty,
+                        returnedQty: "0.0",
+                        returnedCasesTotal: 0,
+                        returnedBottlesTotal: 0,
+                        finalQty: lo.qty,
+                        finalCase: cases,
+                        finalBottle: bottles,
+                        basePrice,
+                        tax,
+                        disc,
+                        finalPrice,
+                        pricePerBottle,
+                        taxAmount: 0,
+                        discAmt: 0,
+                        amount: 0
+                    })
+                }
+
+            } else {
+                const latestRate = getRate(lo.itemCode);
+                if (!latestRate) continue;
+
+                const basePrice = parseFloat((latestRate?.basePrice || 0).toFixed(2));
+                const disc = basePrice * (latestRate?.perDisc || 0) / 100;
+                const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
+                const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
+
+                const pricePerBottle = parseFloat(finalPrice / item?.packOf).toFixed(2);
+
+                if (!settlementMap.get(lo.itemCode)) {
+                    settlementMap.set(lo.itemCode, {
+                        itemCode: lo.itemCode,
+                        cases,
+                        bottles,
+                        loadedQty: lo.qty,
+                        returnedQty: "0.0",
+                        returnedCasesTotal: 0,
+                        returnedBottlesTotal: 0,
+                        finalQty: lo.qty,
+                        finalCase: cases,
+                        finalBottle: bottles,
+                        basePrice,
+                        tax,
+                        disc,
+                        finalPrice,
+                        pricePerBottle,
+                        taxAmount: 0,
+                        discAmt: 0,
+                        amount: 0
+                    })
+                }
+
             }
+
+
         }
 
         if (loadin) {
@@ -174,7 +215,6 @@ router.post("/settlement", async (req, res) => {
                             amount: 0
                         })
                     } else {
-
                         // Accumulate returned cases/bottles numerically across multiple loadin lines
                         agg.returnedCasesTotal = (agg.returnedCasesTotal || 0) + returnedCases;
                         agg.returnedBottlesTotal = (agg.returnedBottlesTotal || 0) + returnedBottles;
@@ -202,6 +242,8 @@ router.post("/settlement", async (req, res) => {
         }
 
         for (const entry of settlementMap.values()) {
+            const item = items.find((i) => i.code === li.itemCode);
+            if (!item) { console.log("Item not found"); continue; }
             const finalQty = entry.finalQty;
 
             const caseAmount = (entry.finalCase) * (entry.finalPrice);
@@ -209,10 +251,10 @@ router.post("/settlement", async (req, res) => {
 
 
             const caseDisc = (entry.finalCase) * (entry.disc);
-            const bottleDisc = (entry.finalBottle) * (entry.disc);
+            const bottleDisc = (entry.finalBottle) * (entry.disc) / (item.packOf || 1);
 
             const caseTax = (entry.finalCase) * (entry.tax);
-            const bottleTax = (entry.finalBottle) * (entry.tax);
+            const bottleTax = (entry.finalBottle) * (entry.tax) / (item.packOf || 1);
 
             entry.amount = parseFloat((caseAmount + bottleAmount).toFixed(2));
             entry.discAmt = parseFloat((caseDisc + bottleDisc).toFixed(2));
