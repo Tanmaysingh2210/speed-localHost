@@ -12,6 +12,7 @@ import S_sheet from '../models/transaction/s_sheet.js';
 import Depo from '../models/depoModal.js';
 import { seperateCrate_Bottle, normalizeCasesBottles } from '../utils/normalizeQty.js';
 import { Item } from '../models/SKU.js';
+import MtPrice from "../models/mtPrice.js";
 
 router.use('/loadout', loadoutRoutes);
 router.use('/loadin', loadinRoutes);
@@ -28,11 +29,12 @@ router.post("/settlement", async (req, res) => {
         const depo = req.user?.depo;
         const saleDate = new Date(date);
 
-        const [loadout, loadin, settlement, rates, items] = await Promise.all([
+        const [loadout, loadin, settlement, rates, mtRates, items] = await Promise.all([
             LoadOut.findOne({ salesmanCode, date, trip, depo }),
             Loadin.findOne({ salesmanCode, date, trip, depo }),
             Settlement.find({ salesmanCode, date, trip, depo }),
             Rate.find({ depo, date: { $lte: saleDate } }).sort({ date: 1 }),
+            MtPrice.find({ depo, date: { $lte: saleDate } }).sort({ date: 1 }),
             Item.find({ depo })
         ]);
 
@@ -58,6 +60,24 @@ router.post("/settlement", async (req, res) => {
             return chosen;
         };
 
+        const mtRateMap = new Map();
+        for (const m of mtRates) {
+            if (!mtRateMap.has(normalize(m.itemCode))) {
+                mtRateMap.set(normalize(m.itemCode), []);
+            }
+            mtRateMap.get(normalize(m.itemCode)).push(m);
+        }
+
+        const getMtRate = (code) => {
+            code = normalize(code);
+            const list = mtRateMap.get(code) || [];
+            let chosen = null;
+            for (const m of list) {
+                if (m.date <= saleDate) chosen = m;
+                else break;
+            }
+            return chosen;
+        };
 
         let NetSale = 0;
         let totalTax = 0;
@@ -173,35 +193,26 @@ router.post("/settlement", async (req, res) => {
                         agg.finalQty = `${finalCases}.${finalBottles}`;
                     }
                 } else {
+                    const rateObj = getMtRate(li.itemCode);
+                    console.log("rate of mt", rateObj);
                     const { cases: emtCases, bottles: emtBottles } = seperateCrate_Bottle(emtVal, item.packOf);
-                    totalRefund += parseFloat((emtCases * price + emtBottles * parseFloat(pricePerBottle)).toFixed(2));
+                    totalRefund += parseFloat((emtCases * (rateObj?.cratePrice || 0) + (emtBottles + emtCases * (item?.packOf || 24)) * parseFloat(rateObj.emptyBottlePrice)).toFixed(2));
                 }
             }
         }
 
         for (const entry of settlementMap.values()) {
             const finalQty = entry.finalQty;
-            console.log("finalQty", finalQty);
-            console.log("finalCase", entry.finalCase);
-            console.log("finalBottle", entry.finalBottle);
 
             const caseAmount = (entry.finalCase) * (entry.finalPrice);
             const bottleAmount = (entry.finalBottle) * (entry.pricePerBottle);
 
-            console.log("caseAmount", caseAmount);
-            console.log("bottleAmount", bottleAmount);
 
             const caseDisc = (entry.finalCase) * (entry.disc);
             const bottleDisc = (entry.finalBottle) * (entry.disc);
 
-            console.log("caseDisc", caseDisc);
-            console.log("bottleDisc", bottleDisc);
-
             const caseTax = (entry.finalCase) * (entry.tax);
             const bottleTax = (entry.finalBottle) * (entry.tax);
-
-            console.log("caseTax", caseTax);
-            console.log("bottleTax", bottleTax);
 
             entry.amount = parseFloat((caseAmount + bottleAmount).toFixed(2));
             entry.discAmt = parseFloat((caseDisc + bottleDisc).toFixed(2));
