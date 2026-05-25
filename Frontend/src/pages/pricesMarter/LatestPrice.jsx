@@ -42,11 +42,11 @@ const LatestPrice = () => {
     const { depos } = useDepo();
     const { user } = useAuth();
 
-    const getDepo= (depo) => {
+    const getDepo = (depo) => {
         if (!depo || !Array.isArray(depos)) return "";
         const id = String(depo).trim();
         const matchDepo = depos.find((d) => String(d._id).trim() === id);
-        return matchDepo ;
+        return matchDepo;
     }
 
 
@@ -67,72 +67,72 @@ const LatestPrice = () => {
 
 
     const exportPDF = async () => {
-    const doc = new jsPDF();
+        const doc = new jsPDF();
 
-    const logoBase64 = await loadImageBase64(pepsiLogo);
-    doc.addImage(logoBase64, "PNG", 12, 3, 45, 25);
+        const logoBase64 = await loadImageBase64(pepsiLogo);
+        doc.addImage(logoBase64, "PNG", 12, 3, 45, 25);
 
-    doc.setFontSize(14);
-    doc.text("SAN BEVERAGES PVT LTD", 105, 15, { align: "center" });
+        doc.setFontSize(14);
+        doc.text("SAN BEVERAGES PVT LTD", 105, 15, { align: "center" });
 
-    doc.setFontSize(8);
-    doc.text(
-        
+        doc.setFontSize(8);
+        doc.text(
+
             // getDepo(user.depo)?.depoName || "",
             getDepo(user.depo)?.depoAddress || "",
-        
-        105,
-        22,
-        { align: "center" }
-    );
 
-    doc.setFontSize(10);
-    doc.text("LATEST PRICE REPORT", 105, 29, { align: "center" });
-
-    const tableData = filtered.map((p, i) => {
-        const rowItem = items.find(
-            it =>
-                String(it.code || it.itemCode || "").toUpperCase() ===
-                String(p.itemCode || "").toUpperCase()
+            105,
+            22,
+            { align: "center" }
         );
 
-        return [
-            i + 1,
-            p.itemCode,
-            rowItem?.name || "",
-            p.basePrice,
-            `${p.perDisc}%`,
-            `${p.perTax}%`,
-            calculateNetRate(p.basePrice, p.perTax, p.perDisc),
-            formatDate(p.date)
-        ];
-    });
+        doc.setFontSize(10);
+        doc.text("LATEST PRICE REPORT", 105, 29, { align: "center" });
 
-    autoTable(doc, {
-        startY: 32,
-        head: [[
-            "SL",
-            "CODE",
-            "NAME",
-            "BASE",
-            "DISC %",
-            "TAX %",
-            "NET RATE",
-            "DATE"
-        ]],
-        body: tableData,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [0, 0, 0] },
-        alternateRowStyles: { fillColor: [245, 245, 245] }
-    });
+        const tableData = filtered.map((p, i) => {
+            const rowItem = items.find(
+                it =>
+                    String(it.code || it.itemCode || "").toUpperCase() ===
+                    String(p.itemCode || "").toUpperCase()
+            );
 
-    const pdfBlob = doc.output("bloburl");
+            return [
+                i + 1,
+                p.itemCode,
+                rowItem?.name || "",
+                p.basePrice,
+                `${p.perDisc}%`,
+                `${p.perTax}%`,
+                calculateNetRate(p.basePrice, p.perTax, p.perDisc),
+                formatDate(p.date)
+            ];
+        });
 
-    const printWindow = window.open(pdfBlob);
-    printWindow.onload = () => {
-        printWindow.print();
+        autoTable(doc, {
+            startY: 32,
+            head: [[
+                "SL",
+                "CODE",
+                "NAME",
+                "BASE",
+                "DISC %",
+                "TAX %",
+                "NET RATE",
+                "DATE"
+            ]],
+            body: tableData,
+            styles: { fontSize: 9 },
+            headStyles: { fillColor: [0, 0, 0] },
+            alternateRowStyles: { fillColor: [245, 245, 245] }
+        });
+
+        const pdfBlob = doc.output("bloburl");
+
+        const printWindow = window.open(pdfBlob);
+        printWindow.onload = () => {
+            printWindow.print();
+        };
     };
-};
 
 
 
@@ -334,8 +334,8 @@ const LatestPrice = () => {
             basePrice: Number(newPrice.basePrice),
             perTax: Number(newPrice.perTax) || 0,
             perDisc: Number(newPrice.perDisc) || 0,
-            date: newPrice.date, 
-            status: editId ? newPrice.status : "Active", 
+            date: newPrice.date,
+            status: editId ? newPrice.status : "Active",
         };
 
 
@@ -509,8 +509,13 @@ const LatestPrice = () => {
                                         type="button"
                                         className="dropdown-btn"
                                         onClick={() =>
-                                            openItemModal((code) =>
-                                                setNewPrice(prev => ({ ...prev, code: code.trim().toUpperCase() }))
+                                            openItemModal(
+                                                (code) =>
+                                                    setNewPrice(prev => ({ ...prev, code: code.trim().toUpperCase() })),
+                                                (item) => {
+                                                    const c = (item.container || "").toLowerCase();
+                                                    return c !== "mt" && c !== "emt";
+                                                }
                                             )
                                         }
                                     >

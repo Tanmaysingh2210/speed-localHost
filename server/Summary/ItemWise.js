@@ -29,17 +29,14 @@ export const ItemWiseSummary = async (req, res) => {
         const itemMap = new Map();
         for (const i of items) {
             const code = normalize(i.code);
-            if (normalize(i.container) === normalize("emt")) continue;
-            else {
-                itemMap.set(code, {
-                    itemCode: code,
-                    name: i.name,
-                    cases: 0,
-                    bottles: 0,
-                    amount: 0,
-                    packOf: i.packOf || 0
-                });
-            }
+            itemMap.set(code, {
+                itemCode: code,
+                name: i.name,
+                cases: 0,
+                bottles: 0,
+                amount: 0,
+                packOf: i.packOf || 0
+            });
         }
 
         const rateMap = new Map();
@@ -120,7 +117,6 @@ export const ItemWiseSummary = async (req, res) => {
                 const agg = itemMap.get(normalize(item.itemCode));
                 if (!agg) continue;
 
-
                 agg.cases -= cases ? cases : 0;
                 agg.bottles -= bottles ? bottles : 0;
                 agg.amount -= finalAmount;
@@ -134,7 +130,6 @@ export const ItemWiseSummary = async (req, res) => {
         let grandTotalAmount = 0;
 
         for (const [itemCode, data] of itemMap) {
-
             const { cases, bottles } = normalizeCasesBottles(data.cases, data.bottles, data.packOf);
 
             summary.push({

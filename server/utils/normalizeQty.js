@@ -12,7 +12,7 @@ export function seperateCrate_Bottle(qty, packOf) {
     const bottles = Math.round((qty - cases) * 100);
     const extraCases = Math.floor(bottles / packOf);
     const remainingBottles = bottles % packOf;
-    return { cases: cases + extraCases, bottles:remainingBottles };
+    return { cases: cases + extraCases, bottles: remainingBottles };
 }
 
 // Normalize cases/bottles after subtraction — borrow from cases when bottles go negative
@@ -27,4 +27,14 @@ export function normalizeCasesBottles(cases, bottles, packOf) {
         bottles -= packOf;
     }
     return { cases, bottles };
+}
+
+export function convertToQty(cases, bottles, packof) {
+    if (!packof || packof <= 0) return { cases, bottles };
+    while (bottles > packof) {
+        cases += 1;
+        bottles -= packof;
+    }
+
+    return `${cases}.${bottles}`;
 }

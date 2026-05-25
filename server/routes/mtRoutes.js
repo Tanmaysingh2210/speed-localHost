@@ -1,5 +1,5 @@
 import express from 'express';
-import { addMtPrice, deleteMtPrice, getAllMtPrice, updateMtPrice } from '../controllers/ratesController/mtPriceController';
+import { addMtPrice, deleteMtPrice, getAllMtPrice, updateMtPrice } from '../controllers/ratesController/mtPriceController.js';
 
 const router = express.Router();
 

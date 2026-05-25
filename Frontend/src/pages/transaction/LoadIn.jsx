@@ -936,7 +936,7 @@ const LoadIn = () => {
                                             <div>{matchedItem ? matchedItem.name : "-"}</div>
                                             <div>
                                                 {matchedItem
-                                                    ? (matchedItem.container.toLowerCase() === "emt" ? Number(it.Emt).toFixed(2) : Number(it.Filled).toFixed(2))
+                                                    ? ((matchedItem.container.toLowerCase() === "emt" || matchedItem.container.toLowerCase() === "mt") ? Number(it.Emt).toFixed(2) : Number(it.Filled).toFixed(2))
                                                     : "-"}
                                             </div>
                                             <div>{Number(it.Burst).toFixed(2)}</div>
@@ -988,7 +988,6 @@ const LoadIn = () => {
                             </div>
 
                             {items
-                                .filter(itm => itm.container.toLowerCase() !== "mt")
                                 .filter(itm =>
                                     itm.code.toLowerCase().includes(search.toLowerCase()) ||
                                     itm.name.toLowerCase().includes(search.toLowerCase())
@@ -1001,7 +1000,7 @@ const LoadIn = () => {
                                             {itm.status}
                                         </div>
 
-                                        {itm.container.toLowerCase() !== "emt" ? (
+                                        {(itm.container.toLowerCase() !== "emt" && itm.container.toLowerCase() !== "mt") ? (
                                             <>
                                                 <input
                                                     type="number" min="0" step="0.01" placeholder="0.00"
@@ -1034,7 +1033,7 @@ const LoadIn = () => {
                                         .map(itm => {
                                             const container = itm.container.toLowerCase();
 
-                                            if (container === "emt") {
+                                            if (container === "emt" || container === "mt") {
                                                 const rawEmt = Number(modalQtyMapEmt[itm.code]) || 0;
                                                 if (rawEmt <= 0) return null;
                                                 return {

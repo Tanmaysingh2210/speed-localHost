@@ -10,13 +10,15 @@ export const ItemModalProvider = ({ children }) => {
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
   const [onSelectCallback, setOnSelectCallback] = useState(null);
+  const [filterFn, setFilterFn] = useState(null);
 
   // utils/quantity.js
 
 
 
-  const openItemModal = (callback) => {
+  const openItemModal = (callback, filter) => {
     setOnSelectCallback(() => callback);
+    setFilterFn(() => filter || null);
     setShow(true);
   };
 
@@ -24,6 +26,7 @@ export const ItemModalProvider = ({ children }) => {
     setShow(false);
     setSearch("");
     setOnSelectCallback(null);
+    setFilterFn(null);
   };
 
   return (
@@ -65,6 +68,7 @@ export const ItemModalProvider = ({ children }) => {
               </div>
 
               {items
+                .filter(it => filterFn ? filterFn(it) : true)
                 .filter(it =>
                   it.code.toLowerCase().includes(search.toLowerCase()) ||
                   it.name.toLowerCase().includes(search.toLowerCase())

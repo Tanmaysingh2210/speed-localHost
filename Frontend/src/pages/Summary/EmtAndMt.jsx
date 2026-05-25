@@ -15,10 +15,11 @@ import { useToast } from '../../context/ToastContext';
 const EmtAndMtSummary = () => {
     const [period, setPeriod] = useState({ startDate: "", endDate: "" });
     const [summary, setSummary] = useState([]);
+    const [grandTotal, setGrandTotal] = useState(null);
     const [loading, setLoading] = useState(false);
     const { depos } = useDepo();
     const { user } = useAuth();
-    const {showToast}=useToast();
+    const { showToast } = useToast();
     const getDepo = (depo) => {
         if (!depo || !Array.isArray(depos)) return "";
         const id = String(depo).trim();
@@ -36,10 +37,10 @@ const EmtAndMtSummary = () => {
             const res = await api.post('/summary/emtandmt', period);
             if (res?.data?.success) {
                 setSummary(res?.data?.data);
+                setGrandTotal(res?.data?.grandTotal || null);
             }
-            console.log("summary", res.data.data);
 
-            showToast("Emt and mt fetch successfully" , "success");
+            showToast("Emt and mt fetch successfully", "success");
         }
         catch (err) {
             showToast(err.response?.data?.message || "Error fetching summary", 'error');
@@ -48,9 +49,6 @@ const EmtAndMtSummary = () => {
             setLoading(false);
         }
     }
-
-
-    let grandTotalShortExcess = 0;
 
     const startRef = useRef(null);
     const endRef = useRef(null);
@@ -96,8 +94,6 @@ const EmtAndMtSummary = () => {
             }
         }
     }
-    let sumMt = 0;
-    let sumEmt = 0;
 
     const loadImageBase64 = (url) =>
         new Promise((resolve) => {
@@ -112,20 +108,11 @@ const EmtAndMtSummary = () => {
             };
             img.src = url;
         });
-    const totals = summary.reduce(
-        (acc, r) => {
-            acc.mt += Number(r.totalMt || 0);
-            acc.emt += Number(r.totalEmt || 0);
-            acc.short += Number(r.totalEmt || 0) - Number(r.totalMt || 0);
-            return acc;
-        },
-        { mt: 0, emt: 0, short: 0 }
-    );
 
 
     const exportSummaryPDF = async () => {
         if (!summary.length) {
-            showToast("No data to export" , "error");
+            showToast("No data to export", "error");
             return;
         }
 
@@ -146,20 +133,21 @@ const EmtAndMtSummary = () => {
             i + 1,
             r.salesmanCode,
             r.name,
-            r.totalMt.toFixed(2),
+            r.totalMt,
             r.totalEmt,
-            `${r.totalEmt - r.totalMt}`
+            `${r.shortExcess} (${r.shortExcessLabel})`
         ]);
 
-        tableData.push([
-            "",
-            "",
-            "TOTAL",
-            totals.mt.toFixed(2),
-            totals.emt.toFixed(2),
-            totals.short.toFixed(2)
-        ]);
-
+        if (grandTotal) {
+            tableData.push([
+                "",
+                "",
+                "TOTAL",
+                grandTotal.grandTotalMt,
+                grandTotal.grandTotalEmt,
+                `${grandTotal.grandTotalShortExcess} (${grandTotal.grandShortExcessLabel})`
+            ]);
+        }
 
         autoTable(doc, {
             startY: 35,
@@ -172,6 +160,15 @@ const EmtAndMtSummary = () => {
                 if (data.row.index === tableData.length - 1) {
                     data.cell.styles.fontStyle = "bold";
                 }
+                // Color the short/excess column
+                if (data.column.index === 5 && data.section === 'body') {
+                    const cellText = String(data.cell.raw || '');
+                    if (cellText.includes('Short')) {
+                        data.cell.styles.textColor = [220, 38, 38];
+                    } else if (cellText.includes('Excess')) {
+                        data.cell.styles.textColor = [22, 163, 74];
+                    }
+                }
             }
         });
 
@@ -182,7 +179,7 @@ const EmtAndMtSummary = () => {
 
     const exportSummaryExcel = async () => {
         if (!summary.length) {
-             showToast("No data to export" , "error");
+            showToast("No data to export", "error");
             return;
         }
 
@@ -213,7 +210,6 @@ const EmtAndMtSummary = () => {
         sheet.getCell("C3").alignment = { horizontal: "center" };
         sheet.getCell("C5").alignment = { horizontal: "center" };
 
-
         sheet.getCell("B2").font = { bold: true, size: 14 };
         sheet.getCell("B3").font = { size: 11 };
         sheet.getCell("B5").font = { bold: true };
@@ -225,36 +221,46 @@ const EmtAndMtSummary = () => {
         sheet.getRow(7).font = { bold: true };
 
         summary.forEach((r, i) => {
-            sheet.addRow([
+            const row = sheet.addRow([
                 i + 1,
                 r.salesmanCode,
                 r.name,
-                r.totalMt.toFixed(2),
+                r.totalMt,
                 r.totalEmt,
-                `${r.totalEmt - r.totalMt}`
+                `${r.shortExcess} (${r.shortExcessLabel})`
             ]);
 
-            
+            // Color the short/excess cell
+            const seCell = row.getCell(6);
+            seCell.font = {
+                color: { argb: r.shortExcessLabel === 'Short' ? 'FFDC2626' : 'FF16A34A' }
+            };
         });
 
-        sheet.addRow([
+        if (grandTotal) {
+            const totalRow = sheet.addRow([
                 "",
                 "",
                 "TOTAL",
-                totals.mt.toFixed(2),
-                totals.emt.toFixed(2),
-                totals.short.toFixed(2)
+                grandTotal.grandTotalMt,
+                grandTotal.grandTotalEmt,
+                `${grandTotal.grandTotalShortExcess} (${grandTotal.grandShortExcessLabel})`
             ]);
-
-        const totalRow = sheet.lastRow;
-        totalRow.font = { bold: true };
+            totalRow.font = { bold: true };
+            const seCell = totalRow.getCell(6);
+            seCell.font = {
+                bold: true,
+                color: { argb: grandTotal.grandShortExcessLabel === 'Short' ? 'FFDC2626' : 'FF16A34A' }
+            };
+        }
 
         sheet.columns = [
             { width: 6 },
             { width: 20 },
             { width: 30 },
             { width: 12 },
-            { width: 14 }
+            { width: 12 },
+            { width: 18 }
         ];
 
         const buffer = await workbook.xlsx.writeBuffer();
@@ -295,12 +301,10 @@ const EmtAndMtSummary = () => {
                                 onClick={getSummary}
                             >
                                 {loading ? "Wait..." : "Find"}
-
                             </button>
                             <button className="export-btn pdf padd trans-submit-btn" onClick={exportSummaryPDF}>
                                 🖨️ Print
                             </button>
-
                             <button className="export-btn excel pdf padd trans-submit-btn" onClick={exportSummaryExcel}>
                                 📊 Excel
                             </button>
@@ -323,68 +327,48 @@ const EmtAndMtSummary = () => {
                         </div>
                     )}
 
-                    {
-                        summary.length === 0 && (
-                            <div style={{
-                                padding: '40px',
-                                textAlign: 'center',
-                                color: '#666',
-                                backgroundColor: 'white'
-                            }}>
-                                No items found
-                            </div>
-                        )
-                    }
-                    {summary.map((p, i) => {
-                        const rowTotal = Number(p.totalEmt || 0) - Number(p.totalMt || 0);
-                        grandTotalShortExcess += rowTotal;
+                    {summary.length === 0 && !loading && (
+                        <div style={{
+                            padding: '40px',
+                            textAlign: 'center',
+                            color: '#666',
+                            backgroundColor: 'white'
+                        }}>
+                            No items found
+                        </div>
+                    )}
 
-                        sumEmt = sumEmt + Number(p.totalEmt || 0);
-                        sumMt = sumMt + Number(p.totalMt);
+                    {summary.map((p, i) => {
+                        const isShort = p.shortExcessLabel === 'Short';
                         return (
                             <div key={i} className="all-row3">
                                 <div>{p.salesmanCode}</div>
                                 <div>{p.name}</div>
                                 <div>{p.totalMt}</div>
                                 <div>{p.totalEmt}</div>
-
-
-                                {(rowTotal >= 0) &&
-
-
-                                    (<div style={{
-                                        color: "green"
-                                    }}> {rowTotal.toFixed(2)}</div>)}
-
-                                {(rowTotal < 0) &&
-                                    (
-                                        <div style={{
-                                            color: "red"
-                                        }}> {rowTotal.toFixed(2)}</div>)}
-
-
+                                <div style={{
+                                    color: isShort ? "#dc2626" : "#16a34a",
+                                    fontWeight: "600"
+                                }}>
+                                    {p.shortExcess}
+                                </div>
                             </div>
                         )
                     })}
-                    {summary.length > 0 && (
-                        <div className="all-row8 total-row">
 
+                    {summary.length > 0 && grandTotal && (
+                        <div className="all-row3 total-row">
+                            <div></div>
                             <div><strong>TOTAL</strong></div>
-
-                            <div>{sumMt}</div>
-                            <div>{sumEmt}</div>
-                            {
-                                grandTotalShortExcess > 0 &&
-                                <div style={{
-                                    color: "green"
-                                }}><strong>{grandTotalShortExcess.toFixed(2)}</strong></div>
-                            }
-                            {
-                                grandTotalShortExcess < 0 &&
-                                <div style={{
-                                    color: "red"
-                                }}><strong>{grandTotalShortExcess.toFixed(2)}</strong></div>
-                            }
+                            <div style={{ textAlign: "center" }}><strong>{grandTotal.grandTotalMt}</strong></div>
+                            <div style={{ textAlign: "center" }}><strong>{grandTotal.grandTotalEmt}</strong></div>
+                            <div style={{
+                                color: grandTotal.grandShortExcessLabel === 'Short' ? "#dc2626" : "#16a34a",
+                                fontWeight: "700",
+                                textAlign: "right"
+                            }}>
+                                <strong>{grandTotal.grandTotalShortExcess}</strong>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -392,4 +376,4 @@ const EmtAndMtSummary = () => {
         </div>
     )
 }
-export default EmtAndMtSummary; 
+export default EmtAndMtSummary;

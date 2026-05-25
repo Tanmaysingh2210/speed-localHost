@@ -7,6 +7,7 @@ const mtPrice = new mongoose.Schema({
     drinkPrice: { type: Number, required: true },
     perTax: { type: Number, default: 0 },
     perDisc: { type: Number, default: 0 },
+    date: { type: Date, required: true },
     depo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'depo-master',
