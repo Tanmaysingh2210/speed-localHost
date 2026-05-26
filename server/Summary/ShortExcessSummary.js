@@ -4,10 +4,10 @@ import LoadOut from "../models/transaction/LoadOut.js";
 import LoadIn from "../models/transaction/loadIn.js";
 import Rate from "../models/rates.js";
 import MtPrice from "../models/mtPrice.js";
-import Settlement from "../models/transaction/Settlement";
-import { seperateCrate_Bottle } from "../utils/normalizeQty";
+import Settlement from "../models/transaction/Settlement.js";
+import { seperateCrate_Bottle } from "../utils/normalizeQty.js";
 
-export const ShortExcessSummary = async (req, res) => {
+export const shortExcessSummary = async (req, res) => {
   const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
   try {
     const { startDate, endDate } = req.body;
