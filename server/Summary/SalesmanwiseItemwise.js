@@ -247,8 +247,10 @@ import LoadIn from "../models/transaction/loadIn.js";
 import Rate from "../models/rates.js";
 import { Item } from "../models/SKU.js";
 import MtPrice from "../models/mtPrice.js";
+import { normalizeCasesBottles, seperateCrate_Bottle } from "../utils/normalizeQty.js";
 
 export const salesmanwiseItemwiseSummary = async (req, res) => {
+  const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
   try {
     const { salesmanCode, startDate, endDate } = req.query;
 
@@ -269,7 +271,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
     const depo = req.user.depo;
     const matchQuery = { salesmanCode, depo, date: { $gte: start, $lte: end } };
 
-    const [loadOutDocs, loadInDocs, rates, mtRates, items] = await Promise.all([
+    const [loadOutDocs, loadInDocs, rates, mtRates, it] = await Promise.all([
       LoadOut.find(matchQuery).lean(),
       LoadIn.find(matchQuery).lean(),
       Rate.find({ depo, date: { $lte: end } }).sort({ date: 1 }),
@@ -318,149 +320,168 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
     const summaryMap = new Map();
     for (const doc of loadOutDocs) {
       for (const items of doc.items) {
-        const item = items.find((i) => String(i.code) === String(items.itemCode));
+
+        const item = it.find((i) => String(i.code) === String(items.itemCode));
         if (!item) continue;
 
-        const latestRate = getRate(doc.date, items.itemCode);
-        if (!latestRate) continue;
+        // Convert qty from string to number
+        const qty = parseFloat(items.qty) || 0;
+        const { cases, bottles } = seperateCrate_Bottle(qty, item.packOf);
+        console.log(items.itemCode, "cases", cases, "bottles", bottles);
 
-        if (!summaryMap.has(items.itemCode)) {
-          summaryMap.set(items.itemCode, {
-            itemCode: items.itemCode,
-            cases: 0,
-            bottles: 0,
-            amount: 0
-          })
-        };
+        if (item.container.toLowerCase() === "mt" || item.container.toLowerCase() == "emt") {
+          const latestMtPrice = getMtRate(doc.date, items.itemCode);
+          console.log("raTE", items.itemCode, latestMtPrice);
+          if (!latestMtPrice) continue;
 
-        const basePrice = parseFloat((latestRate?.basePrice || 0).toFixed(2));
-        const disc = basePrice * (latestRate?.perDisc || 0) / 100;
-        const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
-        const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
+          const basePrice = parseFloat(((latestMtPrice.cratePrice || 0) + (latestMtPrice.emptyBottlePrice || 0) * (item.packOf || 24) + (latestMtPrice.drinkPrice || 0)).toFixed(2));
+          const disc = latestMtPrice.drinkPrice * (latestMtPrice?.perDisc || 0) / 100;
+          const tax = (latestMtPrice.drinkPrice - disc) * (latestMtPrice?.perTax || 0) / 100;
+          const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
 
-        //yaha tak hogya hai
+          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
 
-        const agg = summaryMap.get(items.itemCode);
+          if (!summaryMap.has(items.itemCode)) {
+            summaryMap.set(items.itemCode, {
+              itemCode: items.itemCode,
+              itemName: item?.name || "",
+              cases: 0,
+              bottles: 0,
+              amount: 0
+            })
+          };
 
-        combined.push({
-          date: doc.date,
-          itemCode: items.itemCode,
-          loadOutQty: items.qty,
-          loadInQty: 0,
-          source: "loadout",
-        });
+          const caseAmt = cases * finalPrice;
+          const bottleAmt = pricePerBottle * bottles;
+
+          const amt = caseAmt + bottleAmt;
+          console.log("amt", amt);
+
+          let agg = summaryMap.get(items.itemCode);
+          agg.cases += cases;
+          agg.bottles += bottles;
+          agg.amount += amt;
+
+        } else {
+          const latestRate = getRate(doc.date, items.itemCode);
+          console.log("raTE", items.itemCode, latestRate);
+          if (!latestRate) continue;
+
+          const basePrice = parseFloat((latestRate?.basePrice || 0).toFixed(2));
+          const disc = basePrice * (latestRate?.perDisc || 0) / 100;
+          const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
+          const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
+
+          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+
+          if (!summaryMap.has(items.itemCode)) {
+            summaryMap.set(items.itemCode, {
+              itemCode: items.itemCode,
+              itemName: item?.name || "",
+              cases: 0,
+              bottles: 0,
+              amount: 0
+            })
+          };
+
+          const caseAmt = cases * finalPrice;
+          const bottleAmt = pricePerBottle * bottles;
+
+          const amt = caseAmt + bottleAmt;
+          console.log("amt", amt);
+
+          let agg = summaryMap.get(items.itemCode);
+          agg.cases += cases;
+          agg.bottles += bottles;
+          agg.amount += amt;
+
+        }
       }
     }
 
     for (const doc of loadInDocs) {
       for (const items of doc.items) {
-        combined.push({
-          date: doc.date,
-          itemCode: items.itemCode,
-          loadOutQty: 0,
-          loadInQty: (items.Filled || 0) + (items.Burst || 0),
-          source: "loadin",
-        });
+        const emtVal = items?.Emt || 0;
+        console.log("loadin");
+        if (emtVal == 0) {
+          const item = it.find((i) => String(i.code) === String(items.itemCode));
+          console.log(item);
+          if (!item) continue;
+
+          // Calculate qty from Filled + Burst (convert from strings to numbers)
+          const filled = parseFloat(items.Filled) || 0;
+          const burst = parseFloat(items.Burst) || 0;
+          const qty = filled + burst;
+
+          const { cases, bottles } = seperateCrate_Bottle(qty, item.packOf);
+          console.log(items.itemCode, "cases", cases, "bottles", bottles);
+
+          const latestRate = getRate(doc.date, items.itemCode);
+          console.log("raTE", items.itemCode, latestRate);
+          if (!latestRate) continue;
+
+          const basePrice = parseFloat((latestRate?.basePrice || 0).toFixed(2));
+          const disc = basePrice * (latestRate?.perDisc || 0) / 100;
+          const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
+          const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
+
+          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+
+          if (!summaryMap.has(items.itemCode)) {
+            summaryMap.set(items.itemCode, {
+              itemCode: items.itemCode,
+              itemName: item?.name || "",
+              cases: 0,
+              bottles: 0,
+              amount: 0
+            })
+          };
+
+          const caseAmt = cases * finalPrice;
+          const bottleAmt = pricePerBottle * bottles;
+
+          const amt = caseAmt + bottleAmt;
+          console.log("amt", amt);
+
+          let agg = summaryMap.get(items.itemCode);
+          agg.cases -= cases;
+          agg.bottles -= bottles;
+          agg.amount -= amt;
+        }
       }
     }
 
-    const dayItemMap = {};
+    const summary = [];
+    let grandTotalCases = 0;
+    let grandTotalBottles = 0;
+    let grandTotalAmount = 0;
 
-    for (const record of combined) {
-      const dateKey = new Date(record.date).toISOString().split("T")[0];
-      const key = `${dateKey}|${record.itemCode}`;
+    for (const [itemCode, data] of summaryMap) {
+      console.log(itemCode, data);
+      summary.push({
+        itemCode,
+        name: data.itemName,
+        cases: data.cases,
+        bottles: data.bottles,
+        amount: Number(parseFloat(data.amount).toFixed(2))
+      });
 
-      if (!dayItemMap[key]) {
-        dayItemMap[key] = {
-          date: record.date,
-          itemCode: record.itemCode,
-          loadOutQty: 0,
-          loadInQty: 0,
-        };
+      grandTotalCases += data.cases;
+      grandTotalBottles += data.bottles;
+      grandTotalAmount += Number(data.amount || 0);
+    }
+
+    summary.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
+
+    res.status(200).json({
+      success: true,
+      data: summary,
+      grandTotal: {
+        grandTotalCases,
+        grandTotalBottles,
+        amount: parseFloat(grandTotalAmount.toFixed(2))
       }
-      dayItemMap[key].loadOutQty += record.loadOutQty;
-      dayItemMap[key].loadInQty += record.loadInQty;
-    }
-
-    const dailyItems = Object.values(dayItemMap).map((g) => ({
-      ...g,
-      netQty: g.loadOutQty - g.loadInQty,
-    }));
-
-    // ─── Step 4: Rate lookup (fetch once, match in JS per daily item) ─────────
-    // Fetch all rates for this depo with date <= end (covers any saleDate in range)
-    const uniqueItemCodes = [...new Set(dailyItems.map((d) => d.itemCode))];
-
-    const rateDocs = await Rate.find({
-      depo,
-      date: { $lte: end },
-    }).lean();
-
-    for (const dailyItem of dailyItems) {
-      const saleDate = new Date(dailyItem.date);
-      const itemCodeUpper = dailyItem.itemCode.toUpperCase();
-
-      // Mirror pipeline: $eq toUpper + $lte saleDate + $sort date desc + $limit 1
-      const matchingRates = rateDocs.filter(
-        (r) =>
-          r.itemCode.toUpperCase() === itemCodeUpper &&
-          new Date(r.date) <= saleDate
-      );
-      matchingRates.sort((a, b) => new Date(b.date) - new Date(a.date));
-      const rateDoc = matchingRates[0] || null;
-
-      const safePerDisc = rateDoc?.perDisc ?? 0;
-      const safePerTax = rateDoc?.perTax ?? 0;
-      const basePrice = rateDoc?.basePrice ?? 0;
-
-      const taxablePrice =
-        basePrice - basePrice * (safePerDisc / 100);
-
-      const netRate =
-        taxablePrice + taxablePrice * (safePerTax / 100);
-
-      dailyItem.safePerDisc = safePerDisc;
-      dailyItem.safePerTax = safePerTax;
-      dailyItem.basePrice = basePrice;
-      dailyItem.taxablePrice = taxablePrice;
-      dailyItem.netRate = netRate || 0;
-      dailyItem.dailyAmount = dailyItem.netQty * (dailyItem.netRate || 0);
-    }
-
-    // ─── Step 5: Final group by itemCode → total qtySale + netPrice ───────────
-    const finalMap = {};
-
-    for (const dailyItem of dailyItems) {
-      const { itemCode } = dailyItem;
-
-      if (!finalMap[itemCode]) {
-        finalMap[itemCode] = { itemCode, qtySale: 0, netPrice: 0 };
-      }
-      finalMap[itemCode].qtySale += dailyItem.netQty;
-      finalMap[itemCode].netPrice += dailyItem.dailyAmount;
-    }
-
-    // ─── Step 6: SKU name lookup + final projection + sort ───────────────────
-    const skuDocs = await Item.find({
-      code: { $in: uniqueItemCodes },
-    }).lean();
-
-    const skuMap = {};
-    for (const sku of skuDocs) {
-      skuMap[sku.code] = sku;
-    }
-
-    let result = Object.values(finalMap).map((f) => ({
-      itemCode: f.itemCode,
-      itemName: skuMap[f.itemCode]?.name || "Unknown",
-      qtySale: f.qtySale,
-      netPrice: Math.round(f.netPrice * 100) / 100,
-    }));
-
-    result.sort((a, b) => b.qtySale - a.qtySale);
-
-    console.log("RESULT COUNT:", result.length);
-    res.json(result);
+    });
 
   } catch (err) {
     console.error("SALESMAN-WISE-ITEM-WISE ERROR:", {

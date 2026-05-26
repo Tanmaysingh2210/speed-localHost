@@ -26,6 +26,11 @@ const SalesmanWiseItemWise = () => {
   const saleCodeRef = useRef(null);
   const { depos } = useDepo();
   const { user } = useAuth();
+  const [grandTotal, setGrandTotal] = useState({
+    grandTotalCases: 0,
+    grandTotalBottles: 0,
+    amount: 0
+  });
   const getDepo = (depo) => {
     if (!depo || !Array.isArray(depos)) return "";
     const id = String(depo).trim();
@@ -90,7 +95,15 @@ const SalesmanWiseItemWise = () => {
       const res = await api.get(
         `/summary/salesman-wise-item-wise?salesmanCode=${salesmanCode}&startDate=${startDate}&endDate=${endDate}`
       );
-      setRows(res.data);
+      setRows(res.data.data || []);
+
+      setGrandTotal(
+        res.data.grandTotal || {
+          grandTotalCases: 0,
+          grandTotalBottles: 0,
+          amount: 0
+        }
+      );
 
     } catch (err) {
       console.error(err);
@@ -138,23 +151,25 @@ const SalesmanWiseItemWise = () => {
     const tableData = rows.map((r, i) => [
       i + 1,
       r.itemCode,
-      r.itemName,
-      r.qtySale,
-      r.netPrice.toFixed(2)
+      r.name,
+      r.cases,
+      r.bottles,
+      Number(r.amount).toFixed(2)
     ]);
 
     tableData.push([
       "",
       "",
       "TOTAL",
-      totalQty,
-      totalNet.toFixed(2)
+      grandTotal.grandTotalCases,
+      grandTotal.grandTotalBottles,
+      Number(grandTotal.amount).toFixed(2)
     ]);
 
 
     autoTable(doc, {
       startY: 35,
-      head: [["SL", "ITEM CODE", "ITEM NAME", "QTY SALE", "NET PRICE"]],
+      head: [["SL", "ITEM CODE", "ITEM NAME", "CS", "BS", "AMOUNT"]],
       body: tableData,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [0, 0, 0] },
@@ -192,9 +207,9 @@ const SalesmanWiseItemWise = () => {
       ext: { width: 120, height: 70 }
     });
 
-    sheet.mergeCells("C2:J2");
-    sheet.mergeCells("C3:J3");
-    sheet.mergeCells("C5:J5");
+    sheet.mergeCells("C2:F2");
+    sheet.mergeCells("C3:F3");
+    sheet.mergeCells("C5:F5");
 
     sheet.getCell("C2").value = "SAN BEVERAGES PVT LTD";
     sheet.getCell("C3").value = getDepo(user.depo)?.depoAddress || "";
@@ -213,8 +228,9 @@ const SalesmanWiseItemWise = () => {
       "SL",
       "ITEM CODE",
       "ITEM NAME",
-      "QTY SALE",
-      "NET PRICE"
+      "CS",
+      "BS",
+      "Amount"
     ];
 
     sheet.getRow(7).font = { bold: true };
@@ -223,9 +239,10 @@ const SalesmanWiseItemWise = () => {
       sheet.addRow([
         i + 1,
         r.itemCode,
-        r.itemName,
-        r.qtySale,
-        r.netPrice.toFixed(2)
+        r.name,
+        r.cases,
+        r.bottles,
+        Number(r.amount).toFixed(2)
       ]);
     });
 
@@ -233,32 +250,25 @@ const SalesmanWiseItemWise = () => {
       "",
       "",
       "TOTAL",
-      totalQty,
-      totalNet.toFixed(2)
+      grandTotal.grandTotalCases,
+      grandTotal.grandTotalBottles,
+      Number(grandTotal.amount).toFixed(2)
     ]);
 
     totalRow.font = { bold: true };
 
     sheet.columns = [
       { width: 6 },
-      { width: 14 },
-      { width: 30 },
-      { width: 12 },
-      { width: 14 }
+      { width: 16 },
+      { width: 34 },
+      { width: 10 },
+      { width: 10 },
+      { width: 16 }
     ];
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), "salesman-wise-summary.xlsx");
   };
-
-
-  const totalQty = rows.reduce((sum, r) => {
-    return sum + (+r.qtySale || 0);
-  }, 0);
-
-  const totalNet = rows.reduce((sum, r) => {
-    return sum + (+r.netPrice || 0);
-  }, 0);
 
 
   return (
@@ -332,11 +342,12 @@ const SalesmanWiseItemWise = () => {
       </div>
       <div className="trans-container set-margin">
         <div className="all-table">
-          <div className="all-row header">
+          <div className="all-row4 header">
             <div>ItemCode</div>
             <div>ItemName</div>
-            <div>Qty Sale</div>
-            <div>Net Price</div>
+            <div>CS</div>
+            <div>BS</div>
+            <div>Amount</div>
           </div>
 
           {rows.length === 0 && (
@@ -348,27 +359,18 @@ const SalesmanWiseItemWise = () => {
           {rows.map((r, i) => (
             <div className="all-row4" key={i}>
               <div>{r.itemCode}</div>
-              <div>{r.itemName}</div>
-              <div>{(r.qtySale >= 0) &&
-                (<div style={{
-                  color: "green"
-                }}> {r.qtySale}</div>)}
+              <div>{r.name}</div>
+              <div style={{ color: r.cases >= 0 ? "green" : "red" }}>
+                {r.cases}
+              </div>
 
-                {(r.qtySale < 0) &&
-                  (
-                    <div style={{
-                      color: "red"
-                    }}> {r.qtySale}</div>)}</div>
-              <div>{(r.netPrice >= 0) &&
-                (<div style={{
-                  color: "green"
-                }}> ₹{r.netPrice.toFixed(2)}</div>)}
+              <div style={{ color: r.bottles >= 0 ? "green" : "red" }}>
+                {r.bottles}
+              </div>
 
-                {(r.netPrice < 0) &&
-                  (
-                    <div style={{
-                      color: "red"
-                    }}> ₹{r.netPrice.toFixed(2)}</div>)}</div>
+              <div style={{ color: r.amount >= 0 ? "green" : "red" }}>
+                ₹{parseFloat(r.amount || 0).toFixed(2)}
+              </div>
             </div>
 
           ))}
@@ -377,8 +379,17 @@ const SalesmanWiseItemWise = () => {
             <div className="all-row4 total-row">
               <div></div>
               <div><strong>Total</strong></div>
-              <div style={{ color: totalQty >= 0 ? "green" : "red" }}>{totalQty}</div>
-              <div style={{ color: totalNet >= 0 ? "green" : "red" }}>₹{totalNet.toFixed(2)}</div>
+              <div style={{ color: Number(grandTotal.grandTotalCases) >= 0 ? "green" : "red" }}>
+                {grandTotal.grandTotalCases}
+              </div>
+
+              <div style={{ color: Number(grandTotal.grandTotalBottles) >= 0 ? "green" : "red" }}>
+                {grandTotal.grandTotalBottles}
+              </div>
+
+              <div style={{ color: Number(grandTotal.amount) >= 0 >= 0 ? "green" : "red" }}>
+                ₹{Number(grandTotal.amount).toFixed(2)}
+              </div>
             </div>
           }
 
