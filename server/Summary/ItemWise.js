@@ -35,7 +35,7 @@ export const ItemWiseSummary = async (req, res) => {
                 cases: 0,
                 bottles: 0,
                 amount: 0,
-                packOf: i.packOf || 0
+                packOf: i?.packOf || 24
             });
         }
 
@@ -66,14 +66,14 @@ export const ItemWiseSummary = async (req, res) => {
                 if (!rate) continue;
                 const it = itemMap.get(normalize(item.itemCode));
                 if (!it) continue;
-                const { cases, bottles } = seperateCrate_Bottle(item.qty, it?.packOf);
+                const { cases, bottles } = seperateCrate_Bottle(item.qty, (it?.packOf || 24));
 
                 const basePrice = rate.basePrice;
                 const taxablePrice = basePrice - (basePrice * ((rate.perDisc || 0) / 100));
                 const tax = taxablePrice * ((rate.perTax || 0) / 100);
 
                 const finalPrice = taxablePrice + tax;
-                const ratePerBottle = finalPrice / it.packOf;
+                const ratePerBottle = finalPrice / (it?.packOf || 24);
 
                 const caseAmount = finalPrice * cases;
                 const bottleAmount = ratePerBottle * bottles;
@@ -85,7 +85,7 @@ export const ItemWiseSummary = async (req, res) => {
                 agg.amount += finalAmount;
                 agg.cases += cases;
                 agg.bottles += bottles;
-                agg.packOf = it?.packOf || 0;
+                agg.packOf = it?.packOf || 24;
             }
         }
 
@@ -108,7 +108,7 @@ export const ItemWiseSummary = async (req, res) => {
                 const tax = taxablePrice * ((rate.perTax || 0) / 100);
 
                 const finalPrice = taxablePrice + tax;
-                const ratePerBottle = finalPrice / it.packOf;
+                const ratePerBottle = finalPrice / (it?.packOf || 24);
 
                 const caseAmount = finalPrice * cases;
                 const bottleAmount = ratePerBottle * bottles;
@@ -120,7 +120,7 @@ export const ItemWiseSummary = async (req, res) => {
                 agg.cases -= cases ? cases : 0;
                 agg.bottles -= bottles ? bottles : 0;
                 agg.amount -= finalAmount;
-                agg.packOf = it?.packOf || 0;
+                agg.packOf = it?.packOf || 24;
             }
         }
 

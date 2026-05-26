@@ -119,7 +119,7 @@ export const shortExcessSummary = async (req, res) => {
           const disc = drinkPrice * (price?.perDisc || 0) / 100;
           const tax = (drinkPrice - disc) * (price?.perTax || 0) / 100;
           const finalPrice = Number(parseFloat((drinkPrice + tax - disc).toFixed(2)));
-          const pricePerbottle = Number(parseFloat(finalPrice / (item.packOf || 1)).toFixed(2));
+          const pricePerbottle = Number(parseFloat(finalPrice / (item.packOf || 24)).toFixed(2));
 
           const amount = Number(parseFloat((finalPrice * cases) + (bottles * pricePerbottle)).toFixed(2));
           agg.amount += amount;
@@ -133,7 +133,7 @@ export const shortExcessSummary = async (req, res) => {
           const tax = (basePrice - disc) * (price?.perTax || 0) / 100;
           const finalPrice = Number(parseFloat((basePrice + tax - disc).toFixed(2)));
 
-          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+          const pricePerBottle = Number(parseFloat(finalPrice / (item?.packOf || 1)).toFixed(2));
 
           const amount = Number(parseFloat((finalPrice * cases) + (bottles * pricePerbottle)).toFixed(2));
           agg.amount += amount;
@@ -175,7 +175,7 @@ export const shortExcessSummary = async (req, res) => {
           const tax = (basePrice - disc) * (price?.perTax || 0) / 100;
           const finalPrice = Number(parseFloat((basePrice + tax - disc).toFixed(2)));
 
-          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+          const pricePerBottle = Number(parseFloat(finalPrice / (item?.packOf || 24)).toFixed(2));
 
           const amount = Number(parseFloat((finalPrice * cases) + (bottles * pricePerbottle)).toFixed(2));
           agg.amount -= amount;
@@ -214,6 +214,7 @@ export const shortExcessSummary = async (req, res) => {
       const shortExcess = Number(parseFloat((data.deposit || 0) - (data.amount || 0)).toFixed(2));
       summary.push({
         salesmanCode,
+        name: data?.name || "",
         cases: data.cases,
         bottles: data.bottles,
         amount: data.amount,
@@ -225,14 +226,14 @@ export const shortExcessSummary = async (req, res) => {
       gtBottles += data.bottles;
       gtAmount += Number(data.amount || 0);
       gtDeposit += Number(data.deposit || 0);
-      gtShortExcess += Number(data.shortExcess || 0);
+      gtShortExcess += Number(shortExcess || 0);
     }
 
     res.status(200).json({
       success: true,
-      summary,
+      data: summary,
       grandTotals: {
-        gtcases,
+        gtCases,
         gtBottles,
         gtAmount: parseFloat(gtAmount.toFixed(2)),
         gtDeposit: parseFloat(gtDeposit.toFixed(2)),

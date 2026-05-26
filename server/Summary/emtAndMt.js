@@ -43,7 +43,7 @@ export const EmtAndMtSummary = async (req, res) => {
                 if (!itemDoc) continue;
 
                 if (itemDoc.container.toLowerCase() === "mt" || itemDoc.container.toLowerCase() === "emt") {
-                    const { cases, bottles } = seperateCrate_Bottle(item.qty, itemDoc?.packOf);
+                    const { cases, bottles } = seperateCrate_Bottle(item.qty, (itemDoc?.packOf || 24));
                     mtCases += cases;
                     mtBottles += bottles;
                 }
@@ -71,7 +71,7 @@ export const EmtAndMtSummary = async (req, res) => {
                 const itemDoc = itemMap.get(item.itemCode.trim().toUpperCase());
                 if (!itemDoc) continue;
                 if (itemDoc.container.toLowerCase() === "emt" || itemDoc.container.toLowerCase() === "mt") {
-                    const { cases, bottles } = seperateCrate_Bottle(item.Emt, itemDoc?.packOf);
+                    const { cases, bottles } = seperateCrate_Bottle(item.Emt, (itemDoc?.packOf || 24));
                     emtCases += cases;
                     emtBottles += bottles;
                 }

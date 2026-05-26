@@ -82,7 +82,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
 
         // Convert qty from string to number
         const qty = parseFloat(items.qty) || 0;
-        const { cases, bottles } = seperateCrate_Bottle(qty, item.packOf);
+        const { cases, bottles } = seperateCrate_Bottle(qty, (item?.packOf || 24));
         console.log(items.itemCode, "cases", cases, "bottles", bottles);
 
         if (item.container.toLowerCase() === "mt" || item.container.toLowerCase() == "emt") {
@@ -95,7 +95,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
           const tax = (latestMtPrice.drinkPrice - disc) * (latestMtPrice?.perTax || 0) / 100;
           const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
 
-          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+          const pricePerBottle = Number(parseFloat(finalPrice / (item?.packOf || 24)).toFixed(2));
 
           if (!summaryMap.has(items.itemCode)) {
             summaryMap.set(items.itemCode, {
@@ -128,7 +128,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
           const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
           const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
 
-          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+          const pricePerBottle = Number(parseFloat(finalPrice / (item?.packOf || 24)).toFixed(2));
 
           if (!summaryMap.has(items.itemCode)) {
             summaryMap.set(items.itemCode, {
@@ -169,7 +169,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
           const burst = parseFloat(items.Burst) || 0;
           const qty = filled + burst;
 
-          const { cases, bottles } = seperateCrate_Bottle(qty, item.packOf);
+          const { cases, bottles } = seperateCrate_Bottle(qty, (item?.packOf || 24));
           console.log(items.itemCode, "cases", cases, "bottles", bottles);
 
           const latestRate = getRate(doc.date, items.itemCode);
@@ -181,7 +181,7 @@ export const salesmanwiseItemwiseSummary = async (req, res) => {
           const tax = (basePrice - disc) * (latestRate?.perTax || 0) / 100;
           const finalPrice = parseFloat((basePrice + tax - disc).toFixed(2));
 
-          const pricePerBottle = Number(parseFloat(finalPrice / item?.packOf).toFixed(2));
+          const pricePerBottle = Number(parseFloat(finalPrice / (item?.packOf || 24)).toFixed(2));
 
           if (!summaryMap.has(items.itemCode)) {
             summaryMap.set(items.itemCode, {
