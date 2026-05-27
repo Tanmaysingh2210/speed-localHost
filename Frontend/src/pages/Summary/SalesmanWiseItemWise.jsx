@@ -92,9 +92,8 @@ const SalesmanWiseItemWise = () => {
     try {
       setLoading(true);
 
-      const res = await api.get(
-        `/summary/salesman-wise-item-wise?salesmanCode=${salesmanCode}&startDate=${startDate}&endDate=${endDate}`
-      );
+
+      const res = await api.post(`/summary/salesman-wise-item-wise`, { salesmanCode, startDate, endDate });
       setRows(res.data.data || []);
 
       setGrandTotal(

@@ -8,7 +8,7 @@ import { normalizeCasesBottles, seperateCrate_Bottle } from "../utils/normalizeQ
 export const salesmanwiseItemwiseSummary = async (req, res) => {
   const normalize = v => typeof v === "string" ? v.trim().toLowerCase() : "";
   try {
-    const { salesmanCode, startDate, endDate } = req.query;
+    const { salesmanCode, startDate, endDate } = req.body;
 
     if (!salesmanCode || !startDate || !endDate) {
       return res.status(400).json({ message: "Missing required parameters" });

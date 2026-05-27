@@ -16,6 +16,13 @@ const ShortExcess = () => {
     const [endDate, setEndDate] = useState("");
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [grandTotals, setGrandTotals] = useState({
+        gtCases: 0,
+        gtBottles: 0,
+        gtAmount: 0,
+        gtDeposit: 0,
+        gtShortExcess: 0
+    });
     const { depos } = useDepo();
     const { user } = useAuth();
     const startRef = useRef(null);
@@ -77,12 +84,24 @@ const ShortExcess = () => {
 
         try {
             setLoading(true);
+            const payload = {
+                startDate,
+                endDate
+            };
 
-            const res = await api.get(
-                `/summary/short-excess-summary?startDate=${startDate}&endDate=${endDate}`
+            const res = await api.post(`/summary/short-excess-summary`, payload);
+
+            setRows(res.data.data || []);
+
+            setGrandTotals(
+                res.data.grandTotals || {
+                    gtCases: 0,
+                    gtBottles: 0,
+                    gtAmount: 0,
+                    gtDeposit: 0,
+                    gtShortExcess: 0
+                }
             );
-
-            setRows(res.data);
 
         } catch (err) {
             console.error(err);
@@ -91,21 +110,6 @@ const ShortExcess = () => {
             setLoading(false);
         }
     };
-    const totalQtySale = rows.reduce((sum, r) => {
-        return sum + (+r.qtySale || 0);
-    }, 0);
-
-    const totalDeposit = rows.reduce((sum, r) => {
-        return sum + (+r.totalDeposit || 0);
-    }, 0)
-
-    const totalNetSale = rows.reduce((sum, r) => {
-        return sum + (+r.netSaleAmount || 0);
-    }, 0);
-
-    const totalShortExcess = rows.reduce((sum, r) => {
-        return sum + (r.shortExcess || 0);
-    }, 0)
 
     const loadImageBase64 = (url) =>
         new Promise((resolve) => {
@@ -145,28 +149,50 @@ const ShortExcess = () => {
         const tableData = rows.map((r, i) => [
             i + 1,
             r.salesmanCode,
-            r.salesmanName,
-            r.qtySale,
-            r.netSaleAmount.toFixed(2),
-            r.totalDeposit,
+            r.name,
+            r.cases,
+            r.bottles,
+            Number(r.amount).toFixed(2),
+            Number(r.deposit).toFixed(2),
             r.shortExcess
         ]);
         tableData.push([
             "",
             "",
             "TOTAL",
-            totalQtySale,
-            totalNetSale.toFixed(2),
-            totalDeposit.toFixed(2),
-            totalShortExcess.toFixed(2)
+            grandTotals.gtCases,
+            grandTotals.gtBottles,
+            Number(grandTotals.gtAmount).toFixed(2),
+            Number(grandTotals.gtDeposit).toFixed(2),
+            Number(grandTotals.gtShortExcess).toFixed(2)
         ]);
         autoTable(doc, {
             startY: 35,
-            head: [["SL", "SALESMAN CODE", "NAME", "QTY SALE", "NET SALE AMT", "TOTAL DEPOSIT", "SHORT/EXCESS"]],
+            head: [[
+                "SL",
+                "SALESMAN CODE",
+                "NAME",
+                "CS",
+                "BS",
+                "AMOUNT",
+                "DEPOSIT",
+                "SHORT/EXCESS"
+            ]],
             body: tableData,
             styles: { fontSize: 9 },
             headStyles: { fillColor: [0, 0, 0] },
             alternateRowStyles: { fillColor: [245, 245, 245] },
+
+            columnStyles: {
+                0: { cellWidth: 10 },
+                1: { cellWidth: 28 },
+                2: { cellWidth: 45 },
+                3: { cellWidth: 14 },
+                4: { cellWidth: 14 },
+                5: { cellWidth: 25 },
+                6: { cellWidth: 25 },
+                7: { cellWidth: 28 }
+            },
 
             didParseCell(data) {
                 if (data.row.index === tableData.length - 1) {
@@ -201,9 +227,9 @@ const ShortExcess = () => {
             ext: { width: 120, height: 70 }
         });
 
-        sheet.mergeCells("C2:J2");
-        sheet.mergeCells("C3:J3");
-        sheet.mergeCells("C5:J5");
+        sheet.mergeCells("C2:H2");
+        sheet.mergeCells("C3:H3");
+        sheet.mergeCells("C5:H5");
 
         sheet.getCell("C2").value = "SAN BEVERAGES PVT LTD";
         sheet.getCell("C3").value = getDepo(user.depo)?.depoAddress || "";
@@ -219,7 +245,7 @@ const ShortExcess = () => {
         sheet.getCell("B5").font = { bold: true };
 
         sheet.getRow(7).values = [
-            "SL", "SALESMAN CODE", "NAME", "QTY SALE", "NET SALE AMT", "TOTAL DEPOSIT", "SHORT/EXCESS"
+            "SL", "SALESMAN CODE", "NAME", "CS", "BS", "NET SALE AMT", "TOTAL DEPOSIT", "SHORT/EXCESS"
         ];
 
         sheet.getRow(7).font = { bold: true };
@@ -228,10 +254,11 @@ const ShortExcess = () => {
             sheet.addRow([
                 i + 1,
                 r.salesmanCode,
-                r.salesmanName,
-                r.qtySale,
-                r.netSaleAmount.toFixed(2),
-                r.totalDeposit.toFixed(2),
+                r.name,
+                r.cases,
+                r.bottles,
+                Number(r.amount).toFixed(2),
+                Number(r.deposit).toFixed(2),
                 r.shortExcess?.toFixed(2)
             ]);
         });
@@ -240,22 +267,24 @@ const ShortExcess = () => {
             "",
             "",
             "TOTAL",
-            totalQtySale,
-            totalNetSale.toFixed(2),
-            totalDeposit.toFixed(2),
-            totalShortExcess.toFixed(2)
+            grandTotals.gtCases,
+            grandTotals.gtBottles,
+            Number(grandTotals.gtAmount).toFixed(2),
+            Number(grandTotals.gtDeposit).toFixed(2),
+            Number(grandTotals.gtShortExcess).toFixed(2)
         ]);
 
         totalRow.font = { bold: true };
 
         sheet.columns = [
             { width: 6 },
-            { width: 14 },
+            { width: 18 },
             { width: 30 },
-            { width: 12 },
-            { width: 14 },
-            { width: 14 },
-            { width: 14 },
+            { width: 10 },
+            { width: 10 },
+            { width: 16 },
+            { width: 16 },
+            { width: 18 }
         ];
 
         const buffer = await workbook.xlsx.writeBuffer();
@@ -315,10 +344,11 @@ const ShortExcess = () => {
             </div>
             <div className="trans-container set-margin">
                 <div className="all-table">
-                    <div className="all-row header">
+                    <div className="all-row7 header">
                         <div>SalesmanCode</div>
                         <div>Name</div>
-                        <div>Qty Sale</div>
+                        <div>CS</div>
+                        <div>BS</div>
                         <div>Net Sale Amt</div>
                         <div>Total Deposit</div>
                         <div>Short/Excess</div>
@@ -331,12 +361,13 @@ const ShortExcess = () => {
                     )}
 
                     {rows.map((r, i) => (
-                        <div className="all-row6" key={i}>
+                        <div className="all-row7" key={i}>
                             <div>{r.salesmanCode}</div>
-                            <div>{r.salesmanName}</div>
-                            <div>{r.qtySale}</div>
-                            <div>₹{r.netSaleAmount}</div>
-                            <div>₹{r.totalDeposit.toFixed(2)}</div>
+                            <div>{r.name}</div>
+                            <div>{r.cases}</div>
+                            <div>{r.bottles}</div>
+                            <div>₹{Number(r.amount).toFixed(2)}</div>
+                            <div>₹{Number(r.deposit).toFixed(2)}</div>
                             <div>{(r.shortExcess >= 0) &&
                                 (<div style={{
                                     color: "green"
@@ -351,13 +382,31 @@ const ShortExcess = () => {
                         </div>
                     ))}
                     {(rows.length > 0) &&
-                        <div className="all-row6 total-row">
-                            <div ></div>
+                        <div className="all-row7 total-row">
+                            <div></div>
                             <div><strong>Total</strong></div>
-                            <div style={{ color: totalQtySale >= 0 ? "green" : "red" }}>{totalQtySale}</div>
-                            <div >₹{totalNetSale.toFixed(2)}</div>
-                            <div >₹{totalDeposit.toFixed(2)}</div>
-                            <div style={{ color: totalShortExcess >= 0 ? "green" : "red" }}>₹{totalShortExcess.toFixed(2)}</div>
+                            <div style={{ color: grandTotals.gtCases >= 0 ? "green" : "red" }}>
+                                {grandTotals.gtCases}
+                            </div>
+                            <div style={{ color: grandTotals.gtBottles >= 0 ? "green" : "red" }}>
+                                {grandTotals.gtBottles}
+                            </div>
+                            <div>
+                                ₹{Number(grandTotals.gtAmount).toFixed(2)}
+                            </div>
+                            <div>
+                                ₹{Number(grandTotals.gtDeposit).toFixed(2)}
+                            </div>
+                            <div
+                                style={{
+                                    color:
+                                        grandTotals.gtShortExcess >= 0
+                                            ? "green"
+                                            : "red"
+                                }}
+                            >
+                                ₹{Number(grandTotals.gtShortExcess).toFixed(2)}
+                            </div>
                         </div>
                     }
                 </div>

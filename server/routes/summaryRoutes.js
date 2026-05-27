@@ -9,8 +9,8 @@ import {shortExcessSummary} from '../Summary/ShortExcessSummary.js';
 
 router.post('/itemwise', ItemWiseSummary);
 router.post('/cashcheque', CashChequeSummary);
-router.get('/salesman-wise-item-wise', salesmanwiseItemwiseSummary);
-router.get('/short-excess-summary', shortExcessSummary);
+router.post('/salesman-wise-item-wise', salesmanwiseItemwiseSummary);
+router.post('/short-excess-summary', shortExcessSummary);
 router.post('/emtandmt', EmtAndMtSummary);
 router.post('/daywise', DaywiseSummary);
 
